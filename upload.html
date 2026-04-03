@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBES — Upload</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111;
+      --border: #1e1e1e;
+      --accent: #ff2d55;
+      --accent2: #ff6b35;
+      --text: #f0f0f0;
+      --muted: #666;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+      background: var(--bg);
+    }
+
+    .back-btn {
+      background: none; border: none; color: var(--text);
+      font-size: 22px; cursor: pointer;
+    }
+
+    .page-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 2px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .post-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 8px;
+      color: white; font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600;
+      padding: 8px 18px; cursor: pointer;
+      opacity: 0.5; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .post-btn.ready { opacity: 1; pointer-events: all; }
+
+    .container { padding: 24px 20px; max-width: 600px; margin: 0 auto; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(255, 45, 85, 0.05);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+
+    .drop-icon { font-size: 48px; margin-bottom: 12px; }
+    .drop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+    .drop-sub { font-size: 13px; color: var(--muted); }
+
+    /* Preview */
+    .preview-wrap {
+      display: none;
+      position: relative; border-radius: 16px; overflow: hidden;
+      background: #000; margin-bottom: 28px;
+      aspect-ratio: 9/16; max-height: 400px;
+    }
+
+    .preview-wrap video {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+
+    .preview-remove {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(0,0,0,0.7); border: none; border-radius: 50%;
+      width: 36px; height: 36px; color: white;
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 20px; }
+
+    label {
+      display: block; font-size: 12px; font-weight: 500;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px; outline: none;
+      transition: border-color 0.2s; resize: none;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--accent); }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+
+    .char-count { font-size: 12px; color: var(--muted); text-align: right; margin-top: 6px; }
+
+    /* Visibility toggle */
+    .visibility-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+    }
+
+    .visibility-label { font-size: 15px; }
+    .visibility-sub { font-size: 12px; color: var(--muted); }
+
+    .toggle {
+      width: 48px; height: 28px;
+      background: var(--border); border-radius: 14px;
+      position: relative; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 22px; height: 22px;
+      background: white; border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(20px); }
+
+    /* Progress */
+    .upload-progress {
+      display: none; margin-top: 16px;
+    }
+
+    .progress-bar-wrap {
+      background: var(--border); border-radius: 8px; height: 6px;
+      overflow: hidden; margin-bottom: 8px;
+    }
+
+    .progress-bar {
+      height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%; transition: width 0.3s;
+      border-radius: 8px;
+    }
+
+    .progress-text { font-size: 13px; color: var(--muted); text-align: center; }
+
+    .error-msg {
+      background: rgba(255,45,85,0.1); border: 1px solid rgba(255,45,85,0.3);
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 13px; color: var(--accent);
+      margin-top: 16px; display: none;
+    }
+
+    .success-msg {
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 13px; color: #22c55e;
+      margin-top: 16px; display: none;
+    }
+
+    .tips-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+      margin-bottom: 28px;
+    }
+    .tips-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--accent); }
+    .tip { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: flex; gap: 8px; }
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="page-title">NEW VIBE</span>
+  <button class="post-btn" id="postBtn" onclick="uploadVideo()">Post</button>
+</div>
+
+<div class="container">
+
+  <!-- TIPS -->
+  <div class="tips-box">
+    <div class="tips-title">📋 Tips for Best Results</div>
+    <div class="tip">✅ <span>Video mesti format MP4, MOV atau WebM</span></div>
+    <div class="tip">✅ <span>Saiz maksimum: 500MB</span></div>
+    <div class="tip">✅ <span>Durasi: 15 saat hingga 10 minit</span></div>
+    <div class="tip">✅ <span>Ratio terbaik: 9:16 (Portrait)</span></div>
+  </div>
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="videoFile" accept="video/mp4,video/mov,video/quicktime,video/webm" onchange="handleFileSelect(this)" />
+    <div class="drop-icon">🎬</div>
+    <div class="drop-title">Pilih atau Drop Video</div>
+    <div class="drop-sub">MP4, MOV, WebM • Max 500MB</div>
+  </div>
+
+  <!-- VIDEO PREVIEW -->
+  <div class="preview-wrap" id="previewWrap">
+    <video id="videoPreview" controls></video>
+    <button class="preview-remove" onclick="removeVideo()">✕</button>
+  </div>
+
+  <!-- FORM FIELDS -->
+  <div class="form-group">
+    <label>Caption</label>
+    <textarea id="description" placeholder="What's your vibe? Add hashtags like #fyp #trending" rows="3" maxlength="300" oninput="updateCharCount()"></textarea>
+    <div class="char-count"><span id="charCount">0</span>/300</div>
+  </div>
+
+  <div class="form-group">
+    <label>Title (Optional)</label>
+    <input type="text" id="title" placeholder="Give your video a title" maxlength="100" />
+  </div>
+
+  <div class="form-group">
+    <label>Visibility</label>
+    <div class="visibility-row">
+      <div>
+        <div class="visibility-label">Public</div>
+        <div class="visibility-sub">Everyone can see this video</div>
+      </div>
+      <div class="toggle on" id="publicToggle" onclick="this.classList.toggle('on')"></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="upload-progress" id="uploadProgress">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">Uploading...</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="success-msg" id="successMsg"></div>
+
+</div>
+
+<script>
+let selectedFile = null;
+
+(async () => {
+  const user = await getCurrentUser();
+  if (!user) window.location.href = 'auth.html';
+})();
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 500 * 1024 * 1024) {
+    showError('Fail terlalu besar. Max 500MB.');
+    return;
+  }
+  selectedFile = file;
+
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('videoPreview');
+  preview.src = url;
+  document.getElementById('previewWrap').style.display = 'block';
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('postBtn').classList.add('ready');
+}
+
+function removeVideo() {
+  selectedFile = null;
+  document.getElementById('videoPreview').src = '';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('dropZone').style.display = 'block';
+  document.getElementById('postBtn').classList.remove('ready');
+  document.getElementById('videoFile').value = '';
+}
+
+function updateCharCount() {
+  document.getElementById('charCount').textContent = document.getElementById('description').value.length;
+}
+
+// Drag & drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('videoFile').files = dt.files;
+    handleFileSelect(document.getElementById('videoFile'));
+  }
+});
+
+async function uploadVideo() {
+  if (!selectedFile) return;
+
+  const user = await getCurrentUser();
+  if (!user) return window.location.href = 'auth.html';
+
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const isPublic = document.getElementById('publicToggle').classList.contains('on');
+
+  // Show progress
+  document.getElementById('uploadProgress').style.display = 'block';
+  document.getElementById('postBtn').disabled = true;
+  document.getElementById('postBtn').textContent = 'Uploading...';
+  hideMessages();
+
+  try {
+    // Upload video to Supabase Storage
+    const fileExt = selectedFile.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+    updateProgress(10, 'Uploading video...');
+
+    const { data: uploadData, error: uploadError } = await sb.storage
+      .from('videos')
+      .upload(fileName, selectedFile, {
+        cacheControl: '3600',
+        upsert: false,
+        onUploadProgress: (progress) => {
+          const pct = Math.round((progress.loaded / progress.total) * 80) + 10;
+          updateProgress(pct, `Uploading... ${pct}%`);
+        }
+      });
+
+    if (uploadError) throw uploadError;
+
+    updateProgress(90, 'Saving video details...');
+
+    // Get public URL
+    const { data: { publicUrl } } = sb.storage.from('videos').getPublicUrl(fileName);
+
+    // Get video duration
+    const duration = await getVideoDuration(selectedFile);
+
+    // Save to DB
+    const { error: dbError } = await sb.from('videos').insert({
+      user_id: user.id,
+      title: title || null,
+      description: description || null,
+      video_url: publicUrl,
+      duration: Math.round(duration),
+      is_public: isPublic
+    });
+
+    if (dbError) throw dbError;
+
+    updateProgress(100, 'Done! ✨');
+    showSuccess('Video berjaya diupload! 🎉');
+
+    setTimeout(() => window.location.href = 'index.html', 1500);
+
+  } catch (err) {
+    console.error(err);
+    showError('Upload gagal: ' + err.message);
+    document.getElementById('postBtn').disabled = false;
+    document.getElementById('postBtn').textContent = 'Post';
+  }
+}
+
+function updateProgress(pct, text) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = text;
+}
+
+function getVideoDuration(file) {
+  return new Promise(resolve => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => { URL.revokeObjectURL(video.src); resolve(video.duration || 0); };
+    video.src = URL.createObjectURL(file);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('successMsg').style.display = 'none';
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successMsg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('errorMsg').style.display = 'none';
+}
+
+function hideMessages() {
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('successMsg').style.display = 'none';
+}
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

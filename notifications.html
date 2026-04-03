@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Notifikasi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--gold:#ffd700}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+    .mark-read-btn{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+    .mark-read-btn:active{color:var(--accent)}
+
+    /* Filter tabs */
+    .filter-tabs{display:flex;gap:8px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border)}
+    .filter-tabs::-webkit-scrollbar{display:none}
+    .ftab{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--muted);transition:all 0.15s}
+    .ftab.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    /* Notif list */
+    .notif-list{padding-bottom:80px}
+
+    .notif-group-label{padding:12px 16px 6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+
+    .notif-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer;transition:background 0.15s;position:relative;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .notif-item:active{background:rgba(255,255,255,0.04)}
+    .notif-item.unread{background:rgba(255,45,85,0.04)}
+    .notif-item.unread::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:0 2px 2px 0}
+
+    .notif-avatar{position:relative;flex-shrink:0}
+    .notif-avatar img{width:46px;height:46px;border-radius:50%;object-fit:cover}
+    .notif-type-icon{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px}
+    .icon-like{background:#ff2d55}
+    .icon-comment{background:#3b82f6}
+    .icon-follow{background:#8b5cf6}
+    .icon-subscribe{background:#ff2d55}
+    .icon-gift{background:#ffd700}
+    .icon-topup{background:#22c55e}
+    .icon-withdraw{background:#22c55e}
+    .icon-system{background:#666}
+
+    .notif-body{flex:1;min-width:0}
+    .notif-msg{font-size:14px;line-height:1.4;margin-bottom:4px}
+    .notif-msg strong{font-weight:700;color:white}
+    .notif-time{font-size:11px;color:var(--muted)}
+
+    .notif-thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;flex-shrink:0}
+
+    /* Unread badge */
+    .unread-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;flex-shrink:0;margin-top:6px}
+
+    /* Empty */
+    .empty-state{padding:80px 20px;text-align:center;color:var(--muted)}
+    .empty-emoji{font-size:48px;margin-bottom:16px}
+    .empty-title{font-size:18px;color:var(--text);margin-bottom:8px}
+
+    /* Loading */
+    .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Bottom nav */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;height:70px;background:rgba(0,0,0,0.97);display:flex;align-items:center;justify-content:space-around;border-top:1px solid var(--border)}
+    .bottom-tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-size:10px;font-weight:500;transition:color 0.2s;position:relative}
+    .bottom-tab.active{color:white}
+    .upload-tab{background:linear-gradient(135deg,var(--accent),var(--accent2));width:46px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:white}
+    .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+    .upload-tab{background:linear-gradient(135deg,var(--accent),var(--accent2));width:46px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:white}
+    .nav-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:2px 5px;border-radius:10px;min-width:16px;text-align:center}
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<div class="top-bar">
+  <span class="top-title">🔔 Notifikasi</span>
+  <button class="mark-read-btn" onclick="markAllRead()">Mark all read</button>
+</div>
+
+<div class="filter-tabs">
+  <div class="ftab active" id="ftab_all" onclick="setFilter('all')">Semua</div>
+  <div class="ftab" id="ftab_like" onclick="setFilter('like')">❤️ Like</div>
+  <div class="ftab" id="ftab_comment" onclick="setFilter('comment')">💬 Komen</div>
+  <div class="ftab" id="ftab_follow" onclick="setFilter('follow')">👤 Follow</div>
+  <div class="ftab" id="ftab_gift" onclick="setFilter('gift')">🎁 Gift</div>
+  <div class="ftab" id="ftab_system" onclick="setFilter('system')">⚙️ Sistem</div>
+</div>
+
+<div class="notif-list" id="notifList">
+  <div class="spinner"></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab active" href="notifications.html">🔔<span>Notif</span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+let currentUser = null;
+let allNotifs = [];
+let currentFilter = 'all';
+
+const TYPE_ICON = {
+  like: {icon:'❤️', cls:'icon-like'},
+  comment: {icon:'💬', cls:'icon-comment'},
+  follow: {icon:'👤', cls:'icon-follow'},
+  subscribe: {icon:'🔔', cls:'icon-subscribe'},
+  gift: {icon:'🎁', cls:'icon-gift'},
+  topup_approved: {icon:'✅', cls:'icon-topup'},
+  topup_rejected: {icon:'❌', cls:'icon-system'},
+  withdraw_approved: {icon:'💸', cls:'icon-withdraw'},
+  withdraw_rejected: {icon:'❌', cls:'icon-system'},
+  live_start: {icon:'🔴', cls:'icon-system'},
+};
+
+const SYSTEM_TYPES = ['topup_approved','topup_rejected','withdraw_approved','withdraw_rejected','live_start'];
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  await loadNotifications();
+  subscribeRealtime();
+}
+
+async function loadNotifications() {
+  const { data } = await sb.from('notifications')
+    .select('*, actor:actor_id(username, display_name, avatar_url)')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  allNotifs = data || [];
+  renderNotifs();
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.ftab').forEach(el => el.classList.remove('active'));
+  document.getElementById('ftab_' + f)?.classList.add('active');
+  renderNotifs();
+}
+
+function filterNotifs() {
+  if (currentFilter === 'all') return allNotifs;
+  if (currentFilter === 'system') return allNotifs.filter(n => SYSTEM_TYPES.includes(n.type));
+  return allNotifs.filter(n => n.type === currentFilter);
+}
+
+function renderNotifs() {
+  const list = document.getElementById('notifList');
+  const notifs = filterNotifs();
+
+  if (!notifs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-emoji">🔔</div><div class="empty-title">Tiada notifikasi</div><p>Notifikasi akan muncul di sini</p></div>`;
+    return;
+  }
+
+  // Group by Today / Yesterday / Earlier
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yestStr = new Date(now - 86400000).toDateString();
+
+  const groups = { Today: [], Yesterday: [], Earlier: [] };
+  for (const n of notifs) {
+    const d = new Date(n.created_at).toDateString();
+    if (d === todayStr) groups.Today.push(n);
+    else if (d === yestStr) groups.Yesterday.push(n);
+    else groups.Earlier.push(n);
+  }
+
+  let html = '';
+  for (const [label, items] of Object.entries(groups)) {
+    if (!items.length) continue;
+    html += `<div class="notif-group-label">${label === 'Today' ? 'Hari Ini' : label === 'Yesterday' ? 'Semalam' : 'Sebelum Ini'}</div>`;
+    for (const n of items) html += renderNotifItem(n);
+  }
+  list.innerHTML = html;
+}
+
+function renderNotifItem(n) {
+  const actor = n.actor;
+  const avatarSrc = getAvatarUrl(actor);
+  const typeInfo = TYPE_ICON[n.type] || { icon:'🔔', cls:'icon-system' };
+  const href = getNotifLink(n);
+  return `
+    <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="openNotif('${n.id}','${href}')">
+      <div class="notif-avatar">
+        <img src="${avatarSrc}" alt="${actor?.username || 'VIBES'}" onerror="this.src='https://ui-avatars.com/api/?name=V&background=random&color=fff'" />
+        <div class="notif-type-icon ${typeInfo.cls}">${typeInfo.icon}</div>
+      </div>
+      <div class="notif-body">
+        <div class="notif-msg">${n.message}</div>
+        <div class="notif-time">${timeAgo(n.created_at)}</div>
+      </div>
+      ${!n.is_read ? '<div class="unread-dot"></div>' : ''}
+    </div>`;
+}
+
+function getNotifLink(n) {
+  if (n.entity_type === 'video') return `video.html?id=${n.entity_id}`;
+  if (n.entity_type === 'profile') return `profile.html?id=${n.entity_id}`;
+  if (n.entity_type === 'live') return `live.html?id=${n.entity_id}`;
+  if (n.entity_type === 'topup' || n.entity_type === 'withdraw') return `wallet.html`;
+  return '#';
+}
+
+async function openNotif(id, href) {
+  // Mark as read
+  await sb.from('notifications').update({ is_read: true }).eq('id', id);
+  const n = allNotifs.find(x => x.id === id);
+  if (n) n.is_read = true;
+  if (href && href !== '#') window.location.href = href;
+  else renderNotifs();
+}
+
+async function markAllRead() {
+  await sb.from('notifications').update({ is_read: true })
+    .eq('user_id', currentUser.id).eq('is_read', false);
+  allNotifs.forEach(n => n.is_read = true);
+  renderNotifs();
+}
+
+function subscribeRealtime() {
+  sb.channel(`notifs-${currentUser.id}`)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notifications',
+      filter: `user_id=eq.${currentUser.id}`
+    }, async ({ new: notif }) => {
+      // Fetch actor info
+      if (notif.actor_id) {
+        const { data: actor } = await sb.from('profiles').select('username,display_name,avatar_url').eq('id', notif.actor_id).maybeSingle();
+        notif.actor = actor;
+      }
+      allNotifs.unshift(notif);
+      renderNotifs();
+      // Vibrate on mobile
+      if (navigator.vibrate) navigator.vibrate(100);
+    })
+    .subscribe();
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

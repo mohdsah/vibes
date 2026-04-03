@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#050505;--surface:#0e0e0e;--surface2:#141414;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--gold:#ffd700;--green:#22c55e;--blue:#3b82f6}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+    /* SIDEBAR */
+    .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
+    .sidebar-logo{padding:20px 20px 16px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;border-bottom:1px solid var(--border)}
+    .sidebar-admin-label{padding:10px 20px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:12px 20px;cursor:pointer;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;border-left:3px solid transparent}
+    .nav-item:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+    .nav-item.active{color:white;background:rgba(255,45,85,0.1);border-left-color:var(--accent)}
+    .nav-icon{font-size:18px;width:22px;text-align:center}
+    .nav-badge{margin-left:auto;background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px}
+    .sidebar-bottom{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+    .logout-btn{width:100%;padding:10px;background:rgba(255,45,85,0.1);border:1px solid rgba(255,45,85,0.3);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+
+    /* MAIN */
+    .main{margin-left:220px;min-height:100vh}
+    .page-header{padding:24px 28px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .page-title{font-size:22px;font-weight:800}
+    .page-sub{font-size:13px;color:var(--muted);margin-top:2px}
+    .content{padding:24px 28px;padding-bottom:40px}
+
+    /* STAT CARDS */
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px}
+    .stat-card-icon{font-size:28px;margin-bottom:10px}
+    .stat-card-num{font-size:28px;font-weight:800;margin-bottom:4px}
+    .stat-card-label{font-size:12px;color:var(--muted)}
+    .stat-card.accent .stat-card-num{color:var(--accent)}
+    .stat-card.gold .stat-card-num{color:var(--gold)}
+    .stat-card.green .stat-card-num{color:var(--green)}
+    .stat-card.blue .stat-card-num{color:var(--blue)}
+
+    /* TABLE */
+    .table-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px}
+    .table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .table-title{font-size:15px;font-weight:700}
+    .table-action{font-size:13px;color:var(--accent);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif}
+    table{width:100%;border-collapse:collapse}
+    thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);background:var(--surface2)}
+    tbody td{padding:14px 16px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    tbody tr:last-child td{border-bottom:none}
+    tbody tr:hover td{background:rgba(255,255,255,0.02)}
+
+    .user-cell{display:flex;align-items:center;gap:10px}
+    .user-cell img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+    .user-cell-info{}
+    .user-cell-name{font-size:13px;font-weight:600}
+    .user-cell-handle{font-size:11px;color:var(--muted)}
+
+    .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;display:inline-block}
+    .badge-pending{background:rgba(255,165,0,0.15);color:orange}
+    .badge-approved,.badge-paid{background:rgba(34,197,94,0.15);color:var(--green)}
+    .badge-rejected{background:rgba(255,45,85,0.15);color:var(--accent)}
+    .badge-active{background:rgba(59,130,246,0.15);color:var(--blue)}
+
+    .action-btns{display:flex;gap:6px}
+    .btn-approve{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:7px;color:var(--green);font-size:12px;font-weight:700;padding:5px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+    .btn-approve:hover{background:rgba(34,197,94,0.25)}
+    .btn-reject{background:rgba(255,45,85,0.1);border:1px solid rgba(255,45,85,0.3);border-radius:7px;color:var(--accent);font-size:12px;font-weight:700;padding:5px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+    .btn-reject:hover{background:rgba(255,45,85,0.2)}
+    .btn-view{background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;padding:5px 12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+    .receipt-img{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)}
+
+    /* Page sections */
+    .page-section{display:none}
+    .page-section.active{display:block}
+
+    /* Mobile warning */
+    .mobile-warn{display:none;padding:16px;background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);border-radius:12px;margin:16px;font-size:13px;color:orange}
+    @media(max-width:768px){.sidebar{display:none}.main{margin-left:0}.mobile-warn{display:block}.stats-grid{grid-template-columns:repeat(2,1fr)}}
+
+    /* Reject modal */
+    .reject-modal{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;padding:24px}
+    .reject-modal.show{display:flex}
+    .reject-card{background:var(--surface);border-radius:16px;padding:24px;width:100%;max-width:380px}
+    .reject-title{font-size:16px;font-weight:700;margin-bottom:14px}
+    textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;resize:none}
+    textarea:focus{border-color:var(--accent)}
+    .reject-btns{display:flex;gap:8px;margin-top:14px}
+    .reject-btns button{flex:1;padding:11px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-cancel-r{background:var(--surface2);color:var(--muted)}
+    .btn-confirm-r{background:var(--accent);color:white}
+
+    /* Receipt modal */
+    .receipt-modal{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.9);display:none;align-items:center;justify-content:center;padding:20px}
+    .receipt-modal.show{display:flex}
+    .receipt-modal img{max-width:100%;max-height:90vh;border-radius:12px}
+
+    /* Spinner */
+    .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .empty-row td{text-align:center;padding:32px;color:var(--muted);font-size:14px}
+
+    /* User search */
+    .search-bar{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;margin-bottom:16px;max-width:320px}
+    .search-bar input{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;flex:1}
+    .search-bar input::placeholder{color:var(--muted)}
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">VIBES</div>
+  <div class="sidebar-admin-label">Admin Panel</div>
+  <div class="nav-item active" id="nav_dashboard" onclick="switchPage('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+  <div class="nav-item" id="nav_topups" onclick="switchPage('topups')"><span class="nav-icon">🪙</span> Top Up <span class="nav-badge" id="topupBadge">0</span></div>
+  <div class="nav-item" id="nav_withdraws" onclick="switchPage('withdraws')"><span class="nav-icon">💸</span> Withdraw <span class="nav-badge" id="withdrawBadge">0</span></div>
+  <div class="nav-item" id="nav_users" onclick="switchPage('users')"><span class="nav-icon">👥</span> Users</div>
+  <div class="nav-item" id="nav_videos" onclick="switchPage('videos')"><span class="nav-icon">🎬</span> Videos</div>
+  <div class="nav-item" id="nav_lives" onclick="switchPage('lives')"><span class="nav-icon">🔴</span> Live Rooms</div>
+  <div class="sidebar-bottom">
+    <div id="adminInfo" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+    <button class="logout-btn" onclick="adminLogout()">Log Out</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="mobile-warn">⚠️ Admin dashboard paling sesuai di desktop/tablet.</div>
+
+  <!-- ── DASHBOARD ─────────────────────── -->
+  <div class="page-section active" id="sec_dashboard">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Dashboard 📊</div>
+        <div class="page-sub" id="dashDate"></div>
+      </div>
+      <button onclick="loadDashboard()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">🔄 Refresh</button>
+    </div>
+    <div class="content">
+      <div class="stats-grid">
+        <div class="stat-card blue"><div class="stat-card-icon">👥</div><div class="stat-card-num" id="statUsers">—</div><div class="stat-card-label">Total Users</div></div>
+        <div class="stat-card accent"><div class="stat-card-icon">🎬</div><div class="stat-card-num" id="statVideos">—</div><div class="stat-card-label">Total Videos</div></div>
+        <div class="stat-card gold"><div class="stat-card-icon">💎</div><div class="stat-card-num" id="statCoins">—</div><div class="stat-card-label">Coins Diedarkan</div></div>
+        <div class="stat-card green"><div class="stat-card-icon">💰</div><div class="stat-card-num" id="statRevenue">—</div><div class="stat-card-label">Jumlah Top Up (RM)</div></div>
+      </div>
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-card-icon">🔴</div><div class="stat-card-num" id="statLives">—</div><div class="stat-card-label">Live Rooms</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🎁</div><div class="stat-card-num" id="statGifts">—</div><div class="stat-card-label">Gifts Dihantar</div></div>
+        <div class="stat-card"><div class="stat-card-icon">⏳</div><div class="stat-card-num accent" id="statPending">—</div><div class="stat-card-label">Pending Requests</div></div>
+      </div>
+
+      <!-- Recent activity -->
+      <div class="table-card">
+        <div class="table-header"><span class="table-title">⏳ Pending Requests</span><button class="table-action" onclick="switchPage('topups')">Lihat semua →</button></div>
+        <div id="recentPending"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOP UPS ─────────────────────────── -->
+  <div class="page-section" id="sec_topups">
+    <div class="page-header">
+      <div><div class="page-title">🪙 Top Up Requests</div><div class="page-sub">Semak resit dan luluskan permintaan top up</div></div>
+    </div>
+    <div class="content">
+      <div class="table-card">
+        <div class="table-header">
+          <span class="table-title">Semua Requests</span>
+          <select id="topupFilter" onchange="loadTopups()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">Semua</option>
+          </select>
+        </div>
+        <div id="topupsTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WITHDRAWALS ────────────────────── -->
+  <div class="page-section" id="sec_withdraws">
+    <div class="page-header">
+      <div><div class="page-title">💸 Withdraw Requests</div><div class="page-sub">Proses permintaan pengeluaran coins</div></div>
+    </div>
+    <div class="content">
+      <div class="table-card">
+        <div class="table-header">
+          <span class="table-title">Semua Requests</span>
+          <select id="withdrawFilter" onchange="loadWithdraws()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">Semua</option>
+          </select>
+        </div>
+        <div id="withdrawsTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── USERS ──────────────────────────── -->
+  <div class="page-section" id="sec_users">
+    <div class="page-header"><div><div class="page-title">👥 Users</div><div class="page-sub">Urus semua pengguna platform</div></div></div>
+    <div class="content">
+      <div class="search-bar"><span>🔍</span><input type="text" id="userSearch" placeholder="Cari username atau nama..." oninput="searchUsers()" /></div>
+      <div class="table-card">
+        <div id="usersTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIDEOS ─────────────────────────── -->
+  <div class="page-section" id="sec_videos">
+    <div class="page-header"><div><div class="page-title">🎬 Videos</div><div class="page-sub">Semua video di platform</div></div></div>
+    <div class="content">
+      <div class="table-card">
+        <div id="videosTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LIVES ──────────────────────────── -->
+  <div class="page-section" id="sec_lives">
+    <div class="page-header"><div><div class="page-title">🔴 Live Rooms</div><div class="page-sub">Sejarah semua live stream</div></div></div>
+    <div class="content">
+      <div class="table-card">
+        <div id="livesTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT MODAL -->
+<div class="reject-modal" id="rejectModal">
+  <div class="reject-card">
+    <div class="reject-title">❌ Sebab Penolakan</div>
+    <textarea id="rejectNote" rows="3" placeholder="Tulis sebab penolakan (optional)..."></textarea>
+    <div class="reject-btns">
+      <button class="btn-cancel-r" onclick="closeRejectModal()">Batal</button>
+      <button class="btn-confirm-r" onclick="confirmReject()">Tolak</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIPT MODAL -->
+<div class="receipt-modal" id="receiptModal" onclick="closeReceipt()">
+  <img id="receiptFullImg" src="" alt="Receipt" />
+</div>
+
+<script>
+let adminUser = null;
+let rejectTarget = null; // {type, id}
+
+async function init() {
+  adminUser = await getCurrentUser();
+  if (!adminUser) return window.location.href = 'auth.html';
+
+  // Check if admin
+  const { data: adminCheck } = await sb.from('admin_users').select('role').eq('user_id', adminUser.id).maybeSingle();
+  if (!adminCheck) {
+    alert('Akses ditolak. Kau bukan admin.');
+    return window.location.href = 'index.html';
+  }
+
+  const profile = await getCurrentProfile();
+  document.getElementById('adminInfo').textContent = `@${profile?.username} (${adminCheck.role})`;
+  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('ms-MY', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  loadDashboard();
+  loadBadges();
+}
+
+function switchPage(page) {
+  document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('sec_' + page).classList.add('active');
+  document.getElementById('nav_' + page).classList.add('active');
+  if (page === 'topups') loadTopups();
+  else if (page === 'withdraws') loadWithdraws();
+  else if (page === 'users') loadUsers();
+  else if (page === 'videos') loadVideos();
+  else if (page === 'lives') loadLives();
+  else if (page === 'dashboard') loadDashboard();
+}
+
+async function loadBadges() {
+  const [{ count: tc }, { count: wc }] = await Promise.all([
+    sb.from('topup_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    sb.from('withdraw_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+  ]);
+  document.getElementById('topupBadge').textContent = tc || 0;
+  document.getElementById('withdrawBadge').textContent = wc || 0;
+}
+
+async function loadDashboard() {
+  const [
+    { count: uc }, { count: vc }, { count: lc }, { count: gc },
+    { data: coins }, { data: revenue }, { count: pc }
+  ] = await Promise.all([
+    sb.from('profiles').select('*', { count:'exact', head:true }),
+    sb.from('videos').select('*', { count:'exact', head:true }),
+    sb.from('live_rooms').select('*', { count:'exact', head:true }),
+    sb.from('live_gifts').select('*', { count:'exact', head:true }),
+    sb.from('topup_requests').select('coins_amount').eq('status','approved'),
+    sb.from('topup_requests').select('price_myr').eq('status','approved'),
+    sb.from('topup_requests').select('*',{count:'exact',head:true}).eq('status','pending')
+  ]);
+
+  document.getElementById('statUsers').textContent = formatCount(uc || 0);
+  document.getElementById('statVideos').textContent = formatCount(vc || 0);
+  document.getElementById('statLives').textContent = formatCount(lc || 0);
+  document.getElementById('statGifts').textContent = formatCount(gc || 0);
+  document.getElementById('statPending').textContent = pc || 0;
+  const totalCoins = coins?.reduce((s,r) => s + r.coins_amount, 0) || 0;
+  document.getElementById('statCoins').textContent = formatCount(totalCoins);
+  const totalRev = revenue?.reduce((s,r) => s + parseFloat(r.price_myr), 0) || 0;
+  document.getElementById('statRevenue').textContent = 'RM ' + totalRev.toFixed(2);
+
+  // Pending requests
+  const { data: pending } = await sb.from('topup_requests')
+    .select('*, profiles(username, display_name, avatar_url)')
+    .eq('status', 'pending').order('created_at', { ascending: true }).limit(5);
+
+  const el = document.getElementById('recentPending');
+  if (!pending?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">✅ Tiada pending requests</div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>User</th><th>Pakej</th><th>Amaun</th><th>Masa</th><th>Tindakan</th></tr></thead><tbody>${pending.map(r => `
+    <tr>
+      <td><div class="user-cell"><img src="${getAvatarUrl(r.profiles)}" /><div class="user-cell-info"><div class="user-cell-name">${r.profiles?.display_name || '—'}</div><div class="user-cell-handle">@${r.profiles?.username}</div></div></div></td>
+      <td>💎 ${r.coins_amount.toLocaleString()} coins</td>
+      <td>RM ${r.price_myr}</td>
+      <td>${timeAgo(r.created_at)}</td>
+      <td><div class="action-btns">
+        ${r.receipt_url ? `<img src="${r.receipt_url}" class="receipt-img" onclick="viewReceipt('${r.receipt_url}')" title="Lihat resit"/>` : '<span style="color:var(--muted);font-size:12px">Tiada resit</span>'}
+        <button class="btn-approve" onclick="approveTopup('${r.id}')">✅ Lulus</button>
+        <button class="btn-reject" onclick="openReject('topup','${r.id}')">❌ Tolak</button>
+      </div></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+// ── TOP UPS ──────────────────────────────
+async function loadTopups() {
+  const filter = document.getElementById('topupFilter').value;
+  let q = sb.from('topup_requests').select('*, profiles(username,display_name,avatar_url), coin_packages(name)').order('created_at', { ascending: false }).limit(50);
+  if (filter !== 'all') q = q.eq('status', filter);
+  const { data } = await q;
+
+  const el = document.getElementById('topupsTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada rekod</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>User</th><th>Pakej</th><th>Coins</th><th>RM</th><th>Method</th><th>Resit</th><th>Masa</th><th>Status</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(r => `
+      <tr>
+        <td><div class="user-cell"><img src="${getAvatarUrl(r.profiles)}" /><div><div class="user-cell-name">${r.profiles?.display_name||'—'}</div><div class="user-cell-handle">@${r.profiles?.username}</div></div></div></td>
+        <td>${r.coin_packages?.name||'—'}</td>
+        <td>💎 ${r.coins_amount.toLocaleString()}</td>
+        <td>RM ${r.price_myr}</td>
+        <td>${r.payment_method || 'manual'}</td>
+        <td>${r.receipt_url ? `<img src="${r.receipt_url}" class="receipt-img" onclick="viewReceipt('${r.receipt_url}')"/>` : '—'}</td>
+        <td style="font-size:12px">${timeAgo(r.created_at)}</td>
+        <td><span class="badge badge-${r.status}">${r.status}</span></td>
+        <td><div class="action-btns">${r.status === 'pending' ? `
+          <button class="btn-approve" onclick="approveTopup('${r.id}')">✅ Lulus</button>
+          <button class="btn-reject" onclick="openReject('topup','${r.id}')">❌ Tolak</button>` : '—'}
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function approveTopup(id) {
+  if (!confirm('Luluskan top up ini?')) return;
+  const { error } = await sb.from('topup_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  showToastAdmin('✅ Top up diluluskan!');
+  loadTopups(); loadBadges(); loadDashboard();
+}
+
+// ── WITHDRAWALS ──────────────────────────
+async function loadWithdraws() {
+  const filter = document.getElementById('withdrawFilter').value;
+  let q = sb.from('withdraw_requests').select('*, profiles(username,display_name,avatar_url)').order('created_at', { ascending: false }).limit(50);
+  if (filter !== 'all') q = q.eq('status', filter);
+  const { data } = await q;
+
+  const el = document.getElementById('withdrawsTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada rekod</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>User</th><th>Bank</th><th>No. Akaun</th><th>Nama</th><th>Coins</th><th>RM</th><th>Masa</th><th>Status</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(r => `
+      <tr>
+        <td><div class="user-cell"><img src="${getAvatarUrl(r.profiles)}" /><div><div class="user-cell-name">${r.profiles?.display_name||'—'}</div><div class="user-cell-handle">@${r.profiles?.username}</div></div></div></td>
+        <td>${r.bank_name}</td>
+        <td style="font-family:monospace">${r.bank_account}</td>
+        <td>${r.account_name}</td>
+        <td>💎 ${r.coins_amount.toLocaleString()}</td>
+        <td style="color:var(--green);font-weight:700">RM ${r.amount_myr}</td>
+        <td style="font-size:12px">${timeAgo(r.created_at)}</td>
+        <td><span class="badge badge-${r.status}">${r.status}</span></td>
+        <td><div class="action-btns">${r.status === 'pending' ? `
+          <button class="btn-approve" onclick="approveWithdraw('${r.id}')">✅ Lulus</button>
+          <button class="btn-reject" onclick="openReject('withdraw','${r.id}')">❌ Tolak</button>` :
+          r.status === 'approved' ? `<button class="btn-approve" onclick="markPaid('${r.id}')">💸 Mark Paid</button>` : '—'}
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function approveWithdraw(id) {
+  if (!confirm('Luluskan withdraw ini? Coins akan ditolak dari wallet user.')) return;
+  const { error } = await sb.from('withdraw_requests').update({ status: 'approved' }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  showToastAdmin('✅ Withdraw diluluskan!');
+  loadWithdraws(); loadBadges();
+}
+
+async function markPaid(id) {
+  if (!confirm('Tandakan sebagai sudah dibayar?')) return;
+  await sb.from('withdraw_requests').update({ status: 'paid', processed_at: new Date().toISOString() }).eq('id', id);
+  showToastAdmin('💸 Marked as paid!');
+  loadWithdraws();
+}
+
+// ── REJECT ────────────────────────────────
+function openReject(type, id) {
+  rejectTarget = { type, id };
+  document.getElementById('rejectNote').value = '';
+  document.getElementById('rejectModal').classList.add('show');
+}
+function closeRejectModal() { document.getElementById('rejectModal').classList.remove('show'); rejectTarget = null; }
+
+async function confirmReject() {
+  if (!rejectTarget) return;
+  const note = document.getElementById('rejectNote').value.trim();
+  const table = rejectTarget.type === 'topup' ? 'topup_requests' : 'withdraw_requests';
+  const { error } = await sb.from(table).update({ status: 'rejected', admin_note: note || null, processed_at: new Date().toISOString() }).eq('id', rejectTarget.id);
+  if (error) return alert('Error: ' + error.message);
+  closeRejectModal();
+  showToastAdmin('❌ Request ditolak');
+  if (rejectTarget?.type === 'topup') { loadTopups(); loadBadges(); }
+  else { loadWithdraws(); loadBadges(); }
+}
+
+// ── USERS ─────────────────────────────────
+let allUsers = [];
+async function loadUsers() {
+  const { data } = await sb.from('profiles').select('*, user_coins(coins,total_earned)').order('created_at', { ascending: false }).limit(100);
+  allUsers = data || [];
+  renderUsers(allUsers);
+}
+
+function searchUsers() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(allUsers.filter(u => u.username?.includes(q) || u.display_name?.toLowerCase().includes(q)));
+}
+
+function renderUsers(users) {
+  const el = document.getElementById('usersTable');
+  if (!users.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada user</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>User</th><th>Followers</th><th>Videos</th><th>Coins</th><th>Earned</th><th>Daftar</th><th>Tindakan</th></tr></thead>
+    <tbody>${users.map(u => `
+      <tr>
+        <td><div class="user-cell"><img src="${getAvatarUrl(u)}" /><div><div class="user-cell-name">${u.display_name||'—'}</div><div class="user-cell-handle">@${u.username}</div></div></div></td>
+        <td>${formatCount(u.followers_count)}</td>
+        <td>${formatCount(u.videos_count)}</td>
+        <td>💎 ${formatCount(u.user_coins?.[0]?.coins||0)}</td>
+        <td style="color:var(--green)">💎 ${formatCount(u.user_coins?.[0]?.total_earned||0)}</td>
+        <td style="font-size:12px">${timeAgo(u.created_at)}</td>
+        <td><a href="profile.html?id=${u.id}" target="_blank" class="btn-view">Lihat</a></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── VIDEOS ────────────────────────────────
+async function loadVideos() {
+  const { data } = await sb.from('videos').select('*, profiles(username,display_name)').order('created_at', { ascending: false }).limit(50);
+  const el = document.getElementById('videosTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada video</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Creator</th><th>Caption</th><th>Views</th><th>Likes</th><th>Comments</th><th>Upload</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(v => `
+      <tr>
+        <td>@${v.profiles?.username||'—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)">${v.description||v.title||'—'}</td>
+        <td>${formatCount(v.views_count)}</td>
+        <td>${formatCount(v.likes_count)}</td>
+        <td>${formatCount(v.comments_count)}</td>
+        <td style="font-size:12px">${timeAgo(v.created_at)}</td>
+        <td><div class="action-btns">
+          <a href="video.html?id=${v.id}" target="_blank" class="btn-view">Tonton</a>
+          <button class="btn-reject" onclick="deleteVideo('${v.id}')">🗑️</button>
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function deleteVideo(id) {
+  if (!confirm('Padam video ini?')) return;
+  await sb.from('videos').delete().eq('id', id);
+  showToastAdmin('🗑️ Video dipadam');
+  loadVideos();
+}
+
+// ── LIVES ─────────────────────────────────
+async function loadLives() {
+  const { data } = await sb.from('live_rooms').select('*, profiles(username,display_name)').order('started_at', { ascending: false }).limit(50);
+  const el = document.getElementById('livesTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada live room</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Host</th><th>Tajuk</th><th>Status</th><th>Viewers</th><th>Coins</th><th>Mula</th></tr></thead>
+    <tbody>${data.map(r => `
+      <tr>
+        <td>@${r.profiles?.username||'—'}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td>
+        <td><span class="badge ${r.status==='live'?'badge-active':'badge-rejected'}">${r.status}</span></td>
+        <td>${r.viewer_count||0}</td>
+        <td style="color:var(--gold)">💎 ${r.total_coins_earned||0}</td>
+        <td style="font-size:12px">${timeAgo(r.started_at)}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── HELPERS ───────────────────────────────
+function viewReceipt(url) { document.getElementById('receiptFullImg').src = url; document.getElementById('receiptModal').classList.add('show'); }
+function closeReceipt() { document.getElementById('receiptModal').classList.remove('show'); }
+
+function showToastAdmin(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#111;border:1px solid #333;border-radius:10px;padding:12px 18px;font-size:13px;color:white;z-index:999;animation:toastIn 0.3s ease';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+function adminLogout() { sb.auth.signOut().then(() => window.location.href = 'auth.html'); }
+
+const style = document.createElement('style');
+style.textContent = '@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}';
+document.head.appendChild(style);
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

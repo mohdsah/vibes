@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Messages</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+    .new-msg-btn{background:var(--accent);border:none;border-radius:10px;color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:8px 14px;cursor:pointer}
+
+    /* Search */
+    .search-bar{display:flex;align-items:center;gap:10px;margin:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+    .search-bar input{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;flex:1}
+    .search-bar input::placeholder{color:var(--muted)}
+
+    /* Convo list */
+    .convo-item{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid rgba(255,255,255,0.04);position:relative}
+    .convo-item:hover{background:rgba(255,255,255,0.03)}
+    .convo-item.unread{background:rgba(255,45,85,0.04)}
+    .convo-avatar{position:relative;flex-shrink:0}
+    .convo-avatar img{width:50px;height:50px;border-radius:50%;object-fit:cover}
+    .online-dot{position:absolute;bottom:2px;right:2px;width:12px;height:12px;background:#22c55e;border-radius:50%;border:2px solid var(--bg)}
+    .convo-body{flex:1;min-width:0}
+    .convo-name{font-size:15px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+    .convo-time{font-size:11px;color:var(--muted)}
+    .convo-preview{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .unread-badge{background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0}
+
+    /* Empty */
+    .empty-state{padding:80px 20px;text-align:center;color:var(--muted)}
+    .empty-emoji{font-size:56px;margin-bottom:16px}
+    .empty-title{font-size:18px;color:var(--text);margin-bottom:8px}
+    .empty-sub{font-size:14px;line-height:1.5}
+
+    /* Spinner */
+    .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* New message modal */
+    .modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.8);display:none;align-items:flex-end}
+    .modal-overlay.open{display:flex}
+    .new-msg-sheet{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px 40px;width:100%;max-height:70vh;overflow-y:auto}
+    .sheet-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:0 auto 16px}
+    .sheet-title{font-size:16px;font-weight:700;margin-bottom:14px}
+    .user-search-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;margin-bottom:14px}
+    .user-search-input:focus{border-color:var(--accent)}
+    .user-search-input::placeholder{color:var(--muted)}
+    .user-result-item{display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)}
+    .user-result-item:last-child{border-bottom:none}
+    .user-result-item img{width:42px;height:42px;border-radius:50%;object-fit:cover}
+    .ur-name{font-size:14px;font-weight:600}
+    .ur-handle{font-size:12px;color:var(--muted)}
+
+    /* Bottom nav */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;height:70px;background:rgba(0,0,0,0.97);display:flex;align-items:center;justify-content:space-around;border-top:1px solid var(--border)}
+    .bottom-tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-size:10px;font-weight:500;transition:color 0.2s;position:relative}
+    .bottom-tab.active{color:white}
+    .upload-tab{background:linear-gradient(135deg,var(--accent),var(--accent2));width:46px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:white}
+    .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">💬 MESSAGES</span>
+  <button class="new-msg-btn" onclick="openNewMsg()">+ New</button>
+</div>
+
+<div class="search-bar">
+  <span style="color:var(--muted)">🔍</span>
+  <input type="text" placeholder="Cari perbualan..." oninput="filterConvos(this.value)" />
+</div>
+
+<div id="convoList"><div class="spinner"></div></div>
+
+<!-- New message modal -->
+<div class="modal-overlay" id="newMsgModal" onclick="closeMsgOnOverlay(event)">
+  <div class="new-msg-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Mesej Baru</div>
+    <input class="user-search-input" id="userSearchInput" type="text" placeholder="Cari username..." oninput="searchUsers(this.value)" />
+    <div id="userSearchResults"></div>
+  </div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+let currentUser = null;
+let allConvos = [];
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+
+  // Notif badge
+  const { count } = await sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',currentUser.id).eq('is_read',false);
+  if (count > 0) { const b = document.getElementById('notifBadge'); if(b){ b.textContent = count>99?'99+':count; b.style.display='block'; } }
+
+  loadConversations();
+  subscribeRealtime();
+}
+
+async function loadConversations() {
+  const { data } = await sb.from('dm_conversations')
+    .select(`*,
+      user1:user1_id(id,username,display_name,avatar_url),
+      user2:user2_id(id,username,display_name,avatar_url)
+    `)
+    .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+    .order('last_message_at', { ascending: false });
+
+  allConvos = data || [];
+  renderConvos(allConvos);
+}
+
+function getOtherUser(convo) {
+  return convo.user1_id === currentUser.id ? convo.user2 : convo.user1;
+}
+
+function getMyUnread(convo) {
+  return convo.user1_id === currentUser.id ? convo.user1_unread : convo.user2_unread;
+}
+
+function renderConvos(convos) {
+  const el = document.getElementById('convoList');
+  if (!convos.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-emoji">💬</div>
+      <div class="empty-title">Tiada mesej lagi</div>
+      <div class="empty-sub">Mula perbualan dengan seseorang!</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = convos.map(c => {
+    const other = getOtherUser(c);
+    const unread = getMyUnread(c);
+    return `
+      <div class="convo-item ${unread > 0 ? 'unread' : ''}" onclick="openChat('${c.id}','${other?.id}')">
+        <div class="convo-avatar">
+          <img src="${getAvatarUrl(other)}" alt="${other?.display_name}" />
+        </div>
+        <div class="convo-body">
+          <div class="convo-name">
+            <span>${other?.display_name || other?.username}</span>
+            <span class="convo-time">${c.last_message_at ? timeAgo(c.last_message_at) : ''}</span>
+          </div>
+          <div class="convo-preview">
+            <span>${c.last_message || 'Mula perbualan...'}</span>
+            ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function filterConvos(q) {
+  if (!q.trim()) { renderConvos(allConvos); return; }
+  const filtered = allConvos.filter(c => {
+    const other = getOtherUser(c);
+    return other?.username?.includes(q.toLowerCase()) || other?.display_name?.toLowerCase().includes(q.toLowerCase());
+  });
+  renderConvos(filtered);
+}
+
+function openChat(convId, userId) {
+  window.location.href = `dm-chat.html?conv=${convId}&user=${userId}`;
+}
+
+function openNewMsg() { document.getElementById('newMsgModal').classList.add('open'); }
+function closeMsgOnOverlay(e) { if (e.target === e.currentTarget) document.getElementById('newMsgModal').classList.remove('open'); }
+
+let searchTimer = null;
+async function searchUsers(q) {
+  clearTimeout(searchTimer);
+  if (!q.trim()) { document.getElementById('userSearchResults').innerHTML = ''; return; }
+  searchTimer = setTimeout(async () => {
+    const { data } = await sb.from('profiles').select('id,username,display_name,avatar_url')
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .neq('id', currentUser.id).limit(10);
+
+    const el = document.getElementById('userSearchResults');
+    if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Tiada user dijumpai</div>'; return; }
+    el.innerHTML = data.map(u => `
+      <div class="user-result-item" onclick="startChat('${u.id}')">
+        <img src="${getAvatarUrl(u)}" alt="${u.display_name}" />
+        <div>
+          <div class="ur-name">${u.display_name || u.username}</div>
+          <div class="ur-handle">@${u.username}</div>
+        </div>
+      </div>`).join('');
+  }, 300);
+}
+
+async function startChat(userId) {
+  document.getElementById('newMsgModal').classList.remove('open');
+  // Get or create conversation via RPC
+  const { data: convId, error } = await sb.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: userId });
+  if (error) { alert('Gagal buka chat: ' + error.message); return; }
+  window.location.href = `dm-chat.html?conv=${convId}&user=${userId}`;
+}
+
+function subscribeRealtime() {
+  sb.channel(`dm-inbox-${currentUser.id}`)
+    .on('postgres_changes', { event:'*', schema:'public', table:'dm_conversations',
+      filter:`user1_id=eq.${currentUser.id}` }, () => loadConversations())
+    .on('postgres_changes', { event:'*', schema:'public', table:'dm_conversations',
+      filter:`user2_id=eq.${currentUser.id}` }, () => loadConversations())
+    .subscribe();
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

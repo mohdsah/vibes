@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBES — Discover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a; --surface: #111; --border: #1e1e1e;
+      --accent: #ff2d55; --accent2: #ff6b35;
+      --text: #f0f0f0; --muted: #666;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .top-bar {
+      padding: 14px 16px;
+      position: sticky; top: 0; z-index: 10;
+      background: var(--bg);
+    }
+
+    .search-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .search-box {
+      flex: 1; display: flex; align-items: center; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px;
+      transition: border-color 0.2s;
+    }
+    .search-box:focus-within { border-color: var(--accent); }
+    .search-icon { font-size: 16px; color: var(--muted); flex-shrink: 0; }
+    .search-input {
+      flex: 1; background: none; border: none;
+      color: var(--text); font-family: 'DM Sans', sans-serif;
+      font-size: 15px; outline: none;
+    }
+    .search-input::placeholder { color: var(--muted); }
+
+    .cancel-btn {
+      background: none; border: none; color: var(--accent);
+      font-size: 14px; cursor: pointer;
+      display: none; font-family: 'DM Sans', sans-serif;
+    }
+    .cancel-btn.show { display: block; }
+
+    /* Trending tags */
+    .section { padding: 16px; }
+    .section-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+
+    .tags-scroll {
+      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+    }
+    .tags-scroll::-webkit-scrollbar { display: none; }
+
+    .hashtag-pill {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 8px 16px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      white-space: nowrap; transition: background 0.2s, border-color 0.2s;
+    }
+    .hashtag-pill:hover, .hashtag-pill.active {
+      background: rgba(255,45,85,0.1); border-color: var(--accent); color: var(--accent);
+    }
+
+    /* Video grid */
+    .video-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px;
+      padding: 0 0 80px;
+    }
+
+    .video-thumb {
+      aspect-ratio: 9/16; position: relative;
+      cursor: pointer; overflow: hidden; background: var(--surface);
+    }
+    .video-thumb video {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform 0.2s;
+    }
+    .video-thumb:hover video { transform: scale(1.05); }
+    .thumb-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+    }
+    .thumb-meta {
+      position: absolute; bottom: 8px; left: 10px; right: 10px;
+    }
+    .thumb-user { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+    .thumb-stats { font-size: 11px; color: rgba(255,255,255,0.7); display: flex; gap: 8px; }
+
+    /* User results */
+    .user-result {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .user-result:hover { background: var(--surface); }
+    .user-result img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+    .user-info { flex: 1; }
+    .user-display { font-size: 15px; font-weight: 600; }
+    .user-handle { font-size: 13px; color: var(--muted); }
+    .user-followers { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* Bottom nav */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      height: 70px; background: rgba(0,0,0,0.95);
+      display: flex; align-items: center; justify-content: space-around;
+      border-top: 1px solid var(--border);
+    }
+    .bottom-tab { display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); text-decoration:none; font-size:10px; font-weight:500; transition:color 0.2s; position:relative; }
+    .bottom-tab.active { color: white; }
+    .upload-tab { background:linear-gradient(135deg,var(--accent),var(--accent2)); width:46px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; color:white; }
+    .notif-dot { position:absolute; top:-3px; right:-3px; background:var(--accent); color:white; font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px; min-width:16px; text-align:center; display:none; }
+
+    .empty-state { padding: 60px 20px; text-align: center; color: var(--muted); }
+    .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+
+    .results-section { display: none; }
+    .results-section.show { display: block; }
+    .trending-section { display: block; }
+    .trending-section.hide { display: none; }
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="search-row">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput"
+        placeholder="Search videos, users, hashtags..."
+        oninput="handleSearch(this.value)"
+        onfocus="onSearchFocus()"
+      />
+    </div>
+    <button class="cancel-btn" id="cancelBtn" onclick="cancelSearch()">Cancel</button>
+  </div>
+</div>
+
+<div class="trending-section" id="trendingSection">
+  <div class="section">
+    <div class="section-title">Trending 🔥</div>
+    <div class="tags-scroll" id="trendingTags">
+      <div class="hashtag-pill" onclick="searchTag('#fyp')">#fyp</div>
+      <div class="hashtag-pill" onclick="searchTag('#viral')">#viral</div>
+      <div class="hashtag-pill" onclick="searchTag('#trending')">#trending</div>
+      <div class="hashtag-pill" onclick="searchTag('#malaysia')">#malaysia</div>
+      <div class="hashtag-pill" onclick="searchTag('#funny')">#funny</div>
+      <div class="hashtag-pill" onclick="searchTag('#dance')">#dance</div>
+      <div class="hashtag-pill" onclick="searchTag('#food')">#food</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Latest Videos</div>
+  </div>
+  <div class="video-grid" id="discoverGrid"></div>
+</div>
+
+<div class="results-section" id="resultsSection">
+  <div id="userResults"></div>
+  <div id="videoResults"></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab active" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+let searchTimer = null;
+
+// Load unread notif count
+(async () => {
+  const user = await getCurrentUser();
+  if (!user) return;
+  const { count } = await sb.from('notifications').select('*', { count:'exact', head:true }).eq('user_id', user.id).eq('is_read', false);
+  if (count > 0) { const b = document.getElementById('notifBadge'); if(b){ b.textContent = count > 99 ? '99+' : count; b.style.display = 'block'; } }
+})();
+
+async function init() {
+  const { data: videos } = await sb
+    .from('videos')
+    .select('*, profiles(username, display_name)')
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const grid = document.getElementById('discoverGrid');
+  if (!videos || videos.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="emoji">🎬</div><p>No videos yet</p></div>';
+    return;
+  }
+
+  grid.innerHTML = videos.map(v => `
+    <div class="video-thumb" onclick="window.location.href='video.html?id=${v.id}'">
+      <video src="${v.video_url}" muted preload="metadata"></video>
+      <div class="thumb-overlay"></div>
+      <div class="thumb-meta">
+        <div class="thumb-user">@${v.profiles?.username}</div>
+        <div class="thumb-stats">
+          <span>❤️ ${formatCount(v.likes_count)}</span>
+          <span>▶ ${formatCount(v.views_count)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function onSearchFocus() {
+  document.getElementById('cancelBtn').classList.add('show');
+}
+
+function cancelSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('cancelBtn').classList.remove('show');
+  document.getElementById('trendingSection').classList.remove('hide');
+  document.getElementById('resultsSection').classList.remove('show');
+  document.getElementById('searchInput').blur();
+}
+
+function handleSearch(q) {
+  clearTimeout(searchTimer);
+  if (!q.trim()) { cancelSearch(); return; }
+  searchTimer = setTimeout(() => doSearch(q.trim()), 400);
+}
+
+async function doSearch(q) {
+  document.getElementById('trendingSection').classList.add('hide');
+  document.getElementById('resultsSection').classList.add('show');
+
+  // Search users
+  const { data: users } = await sb
+    .from('profiles')
+    .select('*')
+    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .limit(5);
+
+  const userHtml = users && users.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Users</div>
+      ${users.map(u => `
+        <div class="user-result" onclick="window.location.href='profile.html?id=${u.id}'">
+          <img src="${getAvatarUrl(u)}" alt="${u.display_name}" />
+          <div class="user-info">
+            <div class="user-display">${u.display_name || u.username}</div>
+            <div class="user-handle">@${u.username}</div>
+            <div class="user-followers">${formatCount(u.followers_count)} followers</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  // Search videos
+  const { data: videos } = await sb
+    .from('videos')
+    .select('*, profiles(username)')
+    .eq('is_public', true)
+    .or(`description.ilike.%${q}%,title.ilike.%${q}%`)
+    .limit(12);
+
+  const videoHtml = videos && videos.length > 0 ? `
+    <div class="section"><div class="section-title">Videos</div></div>
+    <div class="video-grid">
+      ${videos.map(v => `
+        <div class="video-thumb" onclick="window.location.href='video.html?id=${v.id}'">
+          <video src="${v.video_url}" muted preload="metadata"></video>
+          <div class="thumb-overlay"></div>
+          <div class="thumb-meta">
+            <div class="thumb-user">@${v.profiles?.username}</div>
+            <div class="thumb-stats"><span>❤️ ${formatCount(v.likes_count)}</span></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  if (!userHtml && !videoHtml) {
+    document.getElementById('resultsSection').innerHTML = '<div class="empty-state"><div class="emoji">🔍</div><p>Tiada hasil untuk "<strong>' + q + '</strong>"</p></div>';
+    return;
+  }
+
+  document.getElementById('userResults').innerHTML = userHtml;
+  document.getElementById('videoResults').innerHTML = videoHtml;
+}
+
+function searchTag(tag) {
+  document.getElementById('searchInput').value = tag;
+  document.getElementById('cancelBtn').classList.add('show');
+  doSearch(tag);
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

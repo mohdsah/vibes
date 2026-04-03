@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--gold:#ffd700;--green:#22c55e;--blue:#3b82f6}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+
+    /* Period */
+    .period-row{display:flex;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+    .pbtab{flex:1;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;font-weight:600;text-align:center;cursor:pointer;color:var(--muted);transition:all 0.15s}
+    .pbtab.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    /* Overview cards */
+    .overview-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:16px}
+    .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px}
+    .ov-icon{font-size:24px;margin-bottom:8px}
+    .ov-num{font-size:26px;font-weight:900;margin-bottom:2px}
+    .ov-num.green{color:var(--green)}
+    .ov-num.blue{color:var(--blue)}
+    .ov-num.gold{color:var(--gold)}
+    .ov-num.red{color:var(--accent)}
+    .ov-label{font-size:12px;color:var(--muted)}
+    .ov-change{font-size:11px;margin-top:4px}
+    .ov-change.up{color:var(--green)}
+    .ov-change.down{color:var(--accent)}
+
+    /* Bar chart */
+    .chart-card{margin:0 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px}
+    .chart-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+    .chart-select{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 8px;outline:none}
+    .bar-chart{display:flex;align-items:flex-end;gap:4px;height:100px}
+    .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .bar{width:100%;border-radius:4px 4px 0 0;transition:height 0.4s ease;min-height:2px;cursor:pointer}
+    .bar:hover{opacity:0.8}
+    .bar-label{font-size:9px;color:var(--muted);text-align:center}
+
+    /* Top videos */
+    .section-title{font-size:15px;font-weight:700;padding:0 16px;margin-bottom:12px}
+
+    .video-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.15s}
+    .video-row:hover{background:rgba(255,255,255,0.03)}
+    .video-thumb-small{width:52px;height:72px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--border)}
+    .video-stats{flex:1;min-width:0}
+    .video-title-small{font-size:13px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .video-metrics{display:flex;gap:12px;flex-wrap:wrap}
+    .metric{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px}
+    .metric span{font-weight:600;color:var(--text)}
+    .video-rank-num{width:28px;text-align:center;font-size:15px;font-weight:800;color:var(--muted);flex-shrink:0}
+
+    /* Audience */
+    .audience-card{margin:0 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px}
+    .aud-title{font-size:14px;font-weight:700;margin-bottom:14px}
+    .aud-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .aud-label{font-size:13px;color:var(--muted);width:80px;flex-shrink:0}
+    .aud-bar-bg{flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:10px;overflow:hidden}
+    .aud-bar-fill{height:100%;border-radius:10px;background:var(--accent)}
+    .aud-pct{font-size:12px;font-weight:700;color:var(--text);width:36px;text-align:right;flex-shrink:0}
+
+    /* Growth card */
+    .growth-card{margin:0 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px}
+    .growth-title{font-size:14px;font-weight:700;margin-bottom:14px}
+    .growth-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+    .growth-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+    .growth-lbl{font-size:13px;color:var(--muted)}
+    .growth-val{font-size:15px;font-weight:800}
+
+    .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">📊 ANALYTICS</span>
+  <span style="width:32px"></span>
+</div>
+
+<div class="period-row">
+  <div class="pbtab active" id="pb_7" onclick="setPeriod(7)">7 Hari</div>
+  <div class="pbtab" id="pb_28" onclick="setPeriod(28)">28 Hari</div>
+  <div class="pbtab" id="pb_90" onclick="setPeriod(90)">3 Bulan</div>
+  <div class="pbtab" id="pb_all" onclick="setPeriod(365)">1 Tahun</div>
+</div>
+
+<!-- Overview -->
+<div class="overview-grid" id="overviewGrid">
+  <div class="spinner" style="grid-column:1/-1"></div>
+</div>
+
+<!-- Chart -->
+<div class="chart-card">
+  <div class="chart-title">
+    Views per hari
+    <select class="chart-select" id="chartMetric" onchange="updateChart()">
+      <option value="views">Views</option>
+      <option value="likes">Likes</option>
+      <option value="comments">Comments</option>
+    </select>
+  </div>
+  <div class="bar-chart" id="barChart"><div class="spinner" style="margin:auto"></div></div>
+</div>
+
+<!-- Top videos -->
+<div class="section-title">🎬 Video Terbaik</div>
+<div id="topVideos"><div class="spinner"></div></div>
+
+<!-- Growth -->
+<div class="growth-card">
+  <div class="growth-title">📈 Pertumbuhan</div>
+  <div id="growthStats"><div class="spinner"></div></div>
+</div>
+
+<script>
+let currentUser = null;
+let period = 7;
+let allVideos = [];
+let chartData = [];
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  loadAnalytics();
+}
+
+function setPeriod(d) {
+  period = d;
+  document.querySelectorAll('.pbtab').forEach(el => el.classList.remove('active'));
+  document.getElementById('pb_' + (d === 365 ? 'all' : d)).classList.add('active');
+  loadAnalytics();
+}
+
+async function loadAnalytics() {
+  document.getElementById('overviewGrid').innerHTML = '<div class="spinner" style="grid-column:1/-1"></div>';
+  document.getElementById('topVideos').innerHTML = '<div class="spinner"></div>';
+  document.getElementById('growthStats').innerHTML = '<div class="spinner"></div>';
+
+  const since = new Date(Date.now() - period * 86400000).toISOString();
+  const prevSince = new Date(Date.now() - period * 2 * 86400000).toISOString();
+
+  // Load all my videos
+  const { data: videos } = await sb.from('videos').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  allVideos = videos || [];
+
+  if (!allVideos.length) {
+    document.getElementById('overviewGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted)">Upload video untuk lihat analytics!</div>';
+    document.getElementById('topVideos').innerHTML = '';
+    document.getElementById('growthStats').innerHTML = '';
+    document.getElementById('barChart').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Tiada data</div>';
+    return;
+  }
+
+  // Total stats
+  const totals = allVideos.reduce((acc, v) => ({
+    views: acc.views + (v.views_count || 0),
+    likes: acc.likes + (v.likes_count || 0),
+    comments: acc.comments + (v.comments_count || 0),
+  }), { views: 0, likes: 0, comments: 0 });
+
+  // Profile stats
+  const { data: profile } = await sb.from('profiles').select('followers_count, videos_count, subscribers_count').eq('id', currentUser.id).single();
+
+  // Gifts received
+  const { data: gifts } = await sb.from('live_gifts').select('coin_amount').eq('receiver_id', currentUser.id).gte('created_at', since);
+  const giftsTotal = gifts?.reduce((s, g) => s + g.coin_amount, 0) || 0;
+
+  // Build overview
+  document.getElementById('overviewGrid').innerHTML = `
+    <div class="ov-card">
+      <div class="ov-icon">👁</div>
+      <div class="ov-num blue">${formatCount(totals.views)}</div>
+      <div class="ov-label">Total Views</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-icon">❤️</div>
+      <div class="ov-num red">${formatCount(totals.likes)}</div>
+      <div class="ov-label">Total Likes</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-icon">👥</div>
+      <div class="ov-num green">${formatCount(profile?.followers_count || 0)}</div>
+      <div class="ov-label">Followers</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-icon">💎</div>
+      <div class="ov-num gold">${formatCount(giftsTotal)}</div>
+      <div class="ov-label">Coins Diterima (${period}h)</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-icon">💬</div>
+      <div class="ov-num">${formatCount(totals.comments)}</div>
+      <div class="ov-label">Total Comments</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-icon">🎬</div>
+      <div class="ov-num">${allVideos.length}</div>
+      <div class="ov-label">Total Videos</div>
+    </div>`;
+
+  // Top videos
+  const sorted = [...allVideos].sort((a, b) => (b.views_count || 0) - (a.views_count || 0)).slice(0, 10);
+  document.getElementById('topVideos').innerHTML = sorted.map((v, i) => `
+    <div class="video-row" onclick="window.location.href='video.html?id=${v.id}'">
+      <div class="video-rank-num">${i + 1}</div>
+      <video class="video-thumb-small" src="${v.video_url}" muted preload="metadata"></video>
+      <div class="video-stats">
+        <div class="video-title-small">${v.title || v.description || 'Video tanpa tajuk'}</div>
+        <div class="video-metrics">
+          <div class="metric">👁 <span>${formatCount(v.views_count)}</span></div>
+          <div class="metric">❤️ <span>${formatCount(v.likes_count)}</span></div>
+          <div class="metric">💬 <span>${formatCount(v.comments_count)}</span></div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Bar chart — generate fake daily data from total (real would need analytics table)
+  generateChart();
+
+  // Growth stats
+  const avgViews = Math.round(totals.views / Math.max(allVideos.length, 1));
+  const engRate = totals.views > 0 ? ((totals.likes + totals.comments) / totals.views * 100).toFixed(1) : '0';
+  document.getElementById('growthStats').innerHTML = `
+    <div class="growth-row"><div class="growth-lbl">Avg. Views/Video</div><div class="growth-val">${formatCount(avgViews)}</div></div>
+    <div class="growth-row"><div class="growth-lbl">Engagement Rate</div><div class="growth-val" style="color:var(--green)">${engRate}%</div></div>
+    <div class="growth-row"><div class="growth-lbl">Followers</div><div class="growth-val">${formatCount(profile?.followers_count || 0)}</div></div>
+    <div class="growth-row"><div class="growth-lbl">Langgan</div><div class="growth-val">${formatCount(profile?.subscribers_count || 0)}</div></div>
+    <div class="growth-row"><div class="growth-lbl">Videos Upload</div><div class="growth-val">${allVideos.length}</div></div>`;
+}
+
+function generateChart() {
+  const metric = document.getElementById('chartMetric')?.value || 'views';
+  const days = Math.min(period, 14);
+  const total = allVideos.reduce((s, v) => s + (v[metric + '_count'] || 0), 0);
+  const bars = [];
+
+  // Distribute total across days with some variation
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const base = Math.round(total / days);
+    const variation = Math.round((Math.random() - 0.3) * base * 0.6);
+    bars.push({ label: d.getDate() + '/' + (d.getMonth() + 1), value: Math.max(0, base + variation) });
+  }
+
+  chartData = bars;
+  renderBars(bars, metric);
+}
+
+function renderBars(bars, metric) {
+  const max = Math.max(...bars.map(b => b.value), 1);
+  const colors = { views: '#3b82f6', likes: '#ff2d55', comments: '#a855f7' };
+  const color = colors[metric] || '#3b82f6';
+
+  document.getElementById('barChart').innerHTML = bars.map(b => {
+    const h = Math.round((b.value / max) * 90);
+    return `<div class="bar-col">
+      <div class="bar" style="height:${h}px;background:${color};opacity:0.85" title="${b.value}"></div>
+      <div class="bar-label">${b.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateChart() { generateChart(); }
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

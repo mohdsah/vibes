@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;background:linear-gradient(135deg,var(--gold),#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+    /* Period tabs */
+    .period-tabs{display:flex;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+    .ptab{flex:1;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;text-align:center;cursor:pointer;color:var(--muted);transition:all 0.15s}
+    .ptab.active{background:linear-gradient(135deg,var(--gold),#ff9500);border-color:transparent;color:#000}
+
+    /* Category tabs */
+    .cat-tabs{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;border-bottom:1px solid var(--border)}
+    .cat-tabs::-webkit-scrollbar{display:none}
+    .ctab{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--muted);transition:all 0.15s}
+    .ctab.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    /* Top 3 podium */
+    .podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;padding:24px 16px 0;background:linear-gradient(to bottom,rgba(255,215,0,0.05),transparent)}
+
+    .podium-item{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+    .podium-item:hover{transform:translateY(-4px);transition:transform 0.2s}
+
+    .podium-rank{font-size:22px;font-weight:900}
+    .podium-avatar-wrap{position:relative}
+    .podium-avatar{border-radius:50%;object-fit:cover;border:3px solid}
+    .podium-avatar.rank1{width:76px;height:76px;border-color:var(--gold);box-shadow:0 0 20px rgba(255,215,0,0.4)}
+    .podium-avatar.rank2{width:60px;height:60px;border-color:var(--silver)}
+    .podium-avatar.rank3{width:60px;height:60px;border-color:var(--bronze)}
+    .podium-crown{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:20px}
+    .podium-name{font-size:12px;font-weight:700;text-align:center;max-width:70px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .podium-coins{font-size:11px;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:2px}
+    .podium-stage{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;border-radius:6px 6px 0 0}
+    .podium-stage.s1{background:var(--gold);width:70px;height:48px;margin-top:4px}
+    .podium-stage.s2{background:var(--silver);width:58px;height:36px}
+    .podium-stage.s3{background:var(--bronze);width:58px;height:28px}
+
+    /* List */
+    .rank-list{padding:4px 0 0}
+
+    .rank-item{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .rank-item:hover{background:rgba(255,255,255,0.03)}
+    .rank-item.me{background:rgba(255,45,85,0.06);border-left:3px solid var(--accent)}
+
+    .rank-num{width:28px;text-align:center;font-size:15px;font-weight:800;color:var(--muted);flex-shrink:0}
+    .rank-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0}
+    .rank-info{flex:1;min-width:0}
+    .rank-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
+    .rank-handle{font-size:12px;color:var(--muted)}
+    .rank-right{text-align:right;flex-shrink:0}
+    .rank-coins{font-size:14px;font-weight:800;color:var(--gold)}
+    .rank-gift-count{font-size:11px;color:var(--muted);margin-top:2px}
+
+    /* My rank card */
+    .my-rank-card{margin:16px;background:linear-gradient(135deg,#1a0010,#0a0020);border:1px solid rgba(255,45,85,0.3);border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px}
+    .my-rank-emoji{font-size:32px}
+    .my-rank-info{flex:1}
+    .my-rank-pos{font-size:18px;font-weight:800;color:var(--accent)}
+    .my-rank-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+    /* Loading */
+    .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Bottom nav */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;height:70px;background:rgba(0,0,0,0.97);display:flex;align-items:center;justify-content:space-around;border-top:1px solid var(--border)}
+    .bottom-tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-size:10px;font-weight:500;transition:color 0.2s;position:relative}
+    .bottom-tab.active{color:white}
+    .upload-tab{background:linear-gradient(135deg,var(--accent),var(--accent2));width:46px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:white}
+    .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">🏆 LEADERBOARD</span>
+  <span style="width:32px"></span>
+</div>
+
+<!-- Period tabs -->
+<div class="period-tabs">
+  <div class="ptab active" id="pt_week" onclick="setPeriod('week')">Minggu Ini</div>
+  <div class="ptab" id="pt_month" onclick="setPeriod('month')">Bulan Ini</div>
+  <div class="ptab" id="pt_all" onclick="setPeriod('all')">All Time</div>
+</div>
+
+<!-- Category tabs -->
+<div class="cat-tabs">
+  <div class="ctab active" id="ct_gifters" onclick="setCategory('gifters')">💎 Top Gifters</div>
+  <div class="ctab" id="ct_streamers" onclick="setCategory('streamers')">🔴 Top Streamers</div>
+  <div class="ctab" id="ct_creators" onclick="setCategory('creators')">🎬 Top Creators</div>
+</div>
+
+<!-- My rank -->
+<div class="my-rank-card" id="myRankCard" style="display:none">
+  <div class="my-rank-emoji" id="myRankEmoji">💎</div>
+  <div class="my-rank-info">
+    <div class="my-rank-pos" id="myRankPos">Ranking kau: #—</div>
+    <div class="my-rank-sub" id="myRankSub">Log in untuk lihat ranking kau</div>
+  </div>
+</div>
+
+<!-- Podium top 3 -->
+<div class="podium" id="podium"></div>
+
+<!-- Rank list -->
+<div class="rank-list" id="rankList"><div class="spinner"></div></div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+let currentUser = null;
+let period = 'week';
+let category = 'gifters';
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (currentUser) {
+    // Notif badge
+    const { count } = await sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',currentUser.id).eq('is_read',false);
+    if (count > 0) { const b = document.getElementById('notifBadge'); if(b){ b.textContent = count > 99 ? '99+':count; b.style.display='block'; } }
+  }
+  loadLeaderboard();
+}
+
+function setPeriod(p) {
+  period = p;
+  document.querySelectorAll('.ptab').forEach(el => el.classList.remove('active'));
+  document.getElementById('pt_' + p).classList.add('active');
+  loadLeaderboard();
+}
+
+function setCategory(c) {
+  category = c;
+  document.querySelectorAll('.ctab').forEach(el => el.classList.remove('active'));
+  document.getElementById('ct_' + c).classList.add('active');
+  loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  document.getElementById('podium').innerHTML = '';
+  document.getElementById('rankList').innerHTML = '<div class="spinner"></div>';
+
+  let data = [];
+
+  if (category === 'gifters') {
+    // Top gifters by total coins spent
+    const { data: raw } = await sb.from('user_coins')
+      .select('user_id, total_coins_spent, profiles(id, username, display_name, avatar_url)')
+      .order('total_coins_spent', { ascending: false })
+      .limit(50);
+    data = (raw || []).filter(r => (r.total_coins_spent || 0) > 0).map(r => ({
+      id: r.profiles?.id,
+      username: r.profiles?.username,
+      display_name: r.profiles?.display_name,
+      avatar_url: r.profiles?.avatar_url,
+      score: r.total_coins_spent || 0,
+      scoreLabel: '💎 ' + formatCount(r.total_coins_spent || 0),
+      subLabel: 'coins dihantar',
+    }));
+  } else if (category === 'streamers') {
+    // Top streamers by total coins earned from gifts
+    const { data: raw } = await sb.from('user_coins')
+      .select('user_id, total_earned, profiles(id, username, display_name, avatar_url)')
+      .order('total_earned', { ascending: false })
+      .limit(50);
+    data = (raw || []).filter(r => (r.total_earned || 0) > 0).map(r => ({
+      id: r.profiles?.id,
+      username: r.profiles?.username,
+      display_name: r.profiles?.display_name,
+      avatar_url: r.profiles?.avatar_url,
+      score: r.total_earned || 0,
+      scoreLabel: '💎 ' + formatCount(r.total_earned || 0),
+      subLabel: 'coins dikumpul',
+    }));
+  } else {
+    // Top creators by followers
+    const { data: raw } = await sb.from('profiles')
+      .select('id, username, display_name, avatar_url, followers_count, videos_count')
+      .order('followers_count', { ascending: false })
+      .limit(50);
+    data = (raw || []).filter(r => (r.followers_count || 0) > 0).map(r => ({
+      id: r.id,
+      username: r.username,
+      display_name: r.display_name,
+      avatar_url: r.avatar_url,
+      score: r.followers_count || 0,
+      scoreLabel: formatCount(r.followers_count || 0) + ' followers',
+      subLabel: (r.videos_count || 0) + ' videos',
+    }));
+  }
+
+  // My rank
+  if (currentUser) {
+    const myRank = data.findIndex(d => d.id === currentUser.id);
+    const myCard = document.getElementById('myRankCard');
+    myCard.style.display = 'flex';
+    if (myRank >= 0) {
+      const myData = data[myRank];
+      const rank = getDiletRank(myData.score);
+      document.getElementById('myRankEmoji').textContent = rank.emoji;
+      document.getElementById('myRankPos').textContent = `Ranking kau: #${myRank + 1}`;
+      document.getElementById('myRankSub').textContent = myData.scoreLabel;
+    } else {
+      document.getElementById('myRankEmoji').textContent = '👤';
+      document.getElementById('myRankPos').textContent = 'Kau belum dalam ranking';
+      document.getElementById('myRankSub').textContent = 'Hantar gift untuk masuk leaderboard!';
+    }
+  }
+
+  renderPodium(data.slice(0, 3));
+  renderList(data);
+}
+
+function renderPodium(top3) {
+  if (top3.length < 3) { document.getElementById('podium').innerHTML = ''; return; }
+
+  // Order: 2nd, 1st, 3rd
+  const order = [top3[1], top3[0], top3[2]];
+  const stages = ['s2','s1','s3'];
+  const ranks = ['2nd','1st','3rd'];
+  const sizes = ['rank2','rank1','rank3'];
+  const crowns = ['','👑',''];
+  const heights = ['36','48','28'];
+
+  document.getElementById('podium').innerHTML = order.map((u, i) => `
+    <div class="podium-item" onclick="window.location.href='profile.html?id=${u.id}'">
+      <div class="podium-rank">${['🥈','🥇','🥉'][i]}</div>
+      <div class="podium-avatar-wrap">
+        ${crowns[i] ? `<div class="podium-crown">${crowns[i]}</div>` : ''}
+        <img class="podium-avatar ${sizes[i]}" src="${getAvatarUrl(u)}" alt="${u.display_name}" />
+      </div>
+      <div class="podium-name">${u.display_name || u.username}</div>
+      <div class="podium-coins">${u.scoreLabel}</div>
+      <div class="podium-stage ${stages[i]}">${ranks[i]}</div>
+    </div>`).join('');
+}
+
+function renderList(data) {
+  const list = document.getElementById('rankList');
+  if (!data.length) { list.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted)">Tiada data lagi</div>'; return; }
+
+  list.innerHTML = data.slice(3).map((u, i) => {
+    const pos = i + 4;
+    const rank = getDiletRank(u.score);
+    const isMe = currentUser && u.id === currentUser.id;
+    return `
+      <div class="rank-item ${isMe ? 'me' : ''}" onclick="window.location.href='profile.html?id=${u.id}'">
+        <div class="rank-num">${pos}</div>
+        <img class="rank-avatar" src="${getAvatarUrl(u)}" alt="${u.display_name}" />
+        <div class="rank-info">
+          <div class="rank-name">
+            ${u.display_name || u.username}
+            ${renderRankBadge(u.score)}
+          </div>
+          <div class="rank-handle">@${u.username}</div>
+        </div>
+        <div class="rank-right">
+          <div class="rank-coins">${u.scoreLabel}</div>
+          <div class="rank-gift-count">${u.subLabel}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

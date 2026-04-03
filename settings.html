@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--green:#22c55e}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+    .save-btn{background:var(--accent);border:none;border-radius:8px;color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:8px 16px;cursor:pointer;transition:opacity 0.2s}
+    .save-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* Sections */
+    .settings-section{margin:20px 16px 0}
+    .section-header{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding:0 4px}
+
+    .settings-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px}
+
+    .setting-row{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .setting-row:last-child{border-bottom:none}
+    .setting-row.clickable{cursor:pointer;transition:background 0.1s}
+    .setting-row.clickable:hover{background:rgba(255,255,255,0.03)}
+    .setting-row.danger .setting-label{color:var(--accent)}
+
+    .setting-left{flex:1;min-width:0}
+    .setting-label{font-size:14px;font-weight:500;margin-bottom:2px}
+    .setting-sub{font-size:12px;color:var(--muted)}
+    .setting-value{font-size:13px;color:var(--muted);margin-left:8px;flex-shrink:0}
+    .setting-arrow{color:var(--muted);font-size:18px;margin-left:8px;flex-shrink:0}
+
+    /* Toggle */
+    .toggle{width:46px;height:26px;background:var(--border);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0}
+    .toggle.on{background:var(--green)}
+    .toggle::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:transform 0.2s}
+    .toggle.on::after{transform:translateX(20px)}
+
+    /* Select dropdown */
+    .setting-select{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;outline:none;cursor:pointer}
+    .setting-select:focus{border-color:var(--accent)}
+
+    /* Block list */
+    .blocked-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .blocked-item:last-child{border-bottom:none}
+    .blocked-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover}
+    .blocked-info{flex:1}
+    .blocked-name{font-size:14px;font-weight:600}
+    .blocked-handle{font-size:12px;color:var(--muted)}
+    .unblock-btn{background:rgba(255,45,85,0.1);border:1px solid rgba(255,45,85,0.3);border-radius:8px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer}
+
+    /* Toast */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;color:white;z-index:999;display:none;white-space:nowrap}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+    .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:30px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .empty-sub{text-align:center;padding:24px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">⚙️ SETTINGS</span>
+  <button class="save-btn" id="saveBtn" onclick="saveSettings()">Simpan</button>
+</div>
+
+<!-- ACCOUNT -->
+<div class="settings-section">
+  <div class="section-header">Akaun</div>
+  <div class="settings-card">
+    <div class="setting-row clickable" onclick="window.location.href='profile.html'">
+      <div class="setting-left"><div class="setting-label">Edit Profil</div><div class="setting-sub">Nama, bio, avatar</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row clickable" onclick="window.location.href='wallet.html'">
+      <div class="setting-left"><div class="setting-label">💎 Wallet & Withdraw</div><div class="setting-sub">Baki coins dan pengeluaran</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row clickable" onclick="window.location.href='analytics.html'">
+      <div class="setting-left"><div class="setting-label">📊 Analytics</div><div class="setting-sub">Stats video dan pertumbuhan</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRIVACY -->
+<div class="settings-section">
+  <div class="section-header">Privasi</div>
+  <div class="settings-card">
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">Akaun Peribadi</div><div class="setting-sub">Hanya follower boleh tengok video kau</div></div>
+      <div class="toggle" id="toggle_is_private" onclick="toggleSetting('is_private')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">Tunjuk Status Online</div><div class="setting-sub">Orang lain boleh tengok bila kau online</div></div>
+      <div class="toggle" id="toggle_show_online" onclick="toggleSetting('show_online_status')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">Benarkan Komen</div><div class="setting-sub">Siapa boleh komen video kau</div></div>
+      <select class="setting-select" id="sel_comments" onchange="onSelectChange()">
+        <option value="everyone">Semua orang</option>
+        <option value="following">Followers sahaja</option>
+        <option value="nobody">Tiada siapa</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">Terima Mesej (DM)</div><div class="setting-sub">Siapa boleh menghantar mesej</div></div>
+      <select class="setting-select" id="sel_dm" onchange="onSelectChange()">
+        <option value="everyone">Semua orang</option>
+        <option value="following">Followers sahaja</option>
+        <option value="nobody">Tiada siapa</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">Benarkan Duet</div><div class="setting-sub">Orang lain boleh buat duet dengan video kau</div></div>
+      <div class="toggle" id="toggle_duet" onclick="toggleSetting('allow_duet')"></div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div class="settings-section">
+  <div class="section-header">Notifikasi</div>
+  <div class="settings-card">
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">❤️ Like</div></div>
+      <div class="toggle" id="toggle_notif_like" onclick="toggleSetting('notify_like')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">💬 Komen</div></div>
+      <div class="toggle" id="toggle_notif_comment" onclick="toggleSetting('notify_comment')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">👤 Follow Baru</div></div>
+      <div class="toggle" id="toggle_notif_follow" onclick="toggleSetting('notify_follow')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">🎁 Gift Diterima</div></div>
+      <div class="toggle" id="toggle_notif_gift" onclick="toggleSetting('notify_gift')"></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-left"><div class="setting-label">💬 Mesej Baru</div></div>
+      <div class="toggle" id="toggle_notif_dm" onclick="toggleSetting('notify_dm')"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BLOCK LIST -->
+<div class="settings-section">
+  <div class="section-header">Senarai Blok</div>
+  <div class="settings-card" id="blockListCard">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<!-- DANGER ZONE -->
+<div class="settings-section">
+  <div class="section-header">Lain-lain</div>
+  <div class="settings-card">
+    <div class="setting-row clickable" onclick="clearCache()">
+      <div class="setting-left"><div class="setting-label">🗑️ Clear Cache</div><div class="setting-sub">Padam data tempatan</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row clickable danger" onclick="confirmLogout()">
+      <div class="setting-left"><div class="setting-label">Log Out</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row clickable danger" onclick="confirmDeleteAccount()">
+      <div class="setting-left"><div class="setting-label">Padam Akaun</div><div class="setting-sub">Tindakan ini tidak boleh dibatalkan</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:20px;font-size:12px;color:var(--muted)">
+  VIBES v1.0 • <a href="https://vibes.app" style="color:var(--accent);text-decoration:none">vibes.app</a>
+</div>
+
+<script>
+let currentUser = null;
+let settings = {};
+let isDirty = false;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+
+  // Load or create settings
+  let { data: s } = await sb.from('user_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
+  if (!s) {
+    const { data: ns } = await sb.from('user_settings').insert({ user_id: currentUser.id }).select().single();
+    s = ns || { user_id: currentUser.id, is_private: false, allow_dm_from: 'everyone', show_online_status: true, allow_comments: 'everyone', allow_duet: true, notify_like: true, notify_comment: true, notify_follow: true, notify_gift: true, notify_dm: true };
+  }
+  settings = s || {};
+  renderSettings();
+  loadBlockList();
+}
+
+function renderSettings() {
+  const map = {
+    is_private: 'toggle_is_private',
+    show_online_status: 'toggle_show_online',
+    allow_duet: 'toggle_duet',
+    notify_like: 'toggle_notif_like',
+    notify_comment: 'toggle_notif_comment',
+    notify_follow: 'toggle_notif_follow',
+    notify_gift: 'toggle_notif_gift',
+    notify_dm: 'toggle_notif_dm',
+  };
+  for (const [key, id] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', !!settings[key]);
+  }
+  const dmSel = document.getElementById('sel_dm');
+  if (dmSel) dmSel.value = settings.allow_dm_from || 'everyone';
+  const commentSel = document.getElementById('sel_comments');
+  if (commentSel) commentSel.value = settings.allow_comments || 'everyone';
+}
+
+function toggleSetting(key) {
+  settings[key] = !settings[key];
+  const idMap = { is_private: 'toggle_is_private', show_online_status: 'toggle_show_online', allow_duet: 'toggle_duet', notify_like: 'toggle_notif_like', notify_comment: 'toggle_notif_comment', notify_follow: 'toggle_notif_follow', notify_gift: 'toggle_notif_gift', notify_dm: 'toggle_notif_dm' };
+  const el = document.getElementById(idMap[key]);
+  if (el) el.classList.toggle('on', settings[key]);
+  markDirty();
+}
+
+function onSelectChange() {
+  settings.allow_dm_from = document.getElementById('sel_dm').value;
+  settings.allow_comments = document.getElementById('sel_comments').value;
+  markDirty();
+}
+
+function markDirty() {
+  isDirty = true;
+  document.getElementById('saveBtn').disabled = false;
+}
+
+async function saveSettings() {
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = 'Menyimpan...'; btn.disabled = true;
+
+  const { error } = await sb.from('user_settings').upsert({ ...settings, user_id: currentUser.id, updated_at: new Date().toISOString() });
+  if (error) { showToast('Gagal simpan: ' + error.message); btn.textContent = 'Simpan'; btn.disabled = false; return; }
+
+  showToast('✅ Settings disimpan!');
+  isDirty = false;
+  btn.textContent = 'Simpan';
+  btn.disabled = false;
+}
+
+async function loadBlockList() {
+  const { data } = await sb.from('blocked_users')
+    .select('*, profiles:blocked_id(id, username, display_name, avatar_url)')
+    .eq('blocker_id', currentUser.id).order('created_at', { ascending: false });
+
+  const card = document.getElementById('blockListCard');
+  if (!data?.length) {
+    card.innerHTML = '<div class="empty-sub">Tiada user yang diblok</div>';
+    return;
+  }
+
+  card.innerHTML = data.map(b => `
+    <div class="blocked-item">
+      <img class="blocked-avatar" src="${getAvatarUrl(b.profiles)}" alt="${b.profiles?.display_name}" />
+      <div class="blocked-info">
+        <div class="blocked-name">${b.profiles?.display_name || b.profiles?.username}</div>
+        <div class="blocked-handle">@${b.profiles?.username}</div>
+      </div>
+      <button class="unblock-btn" onclick="unblockUser('${b.blocked_id}', this)">Unblock</button>
+    </div>`).join('');
+}
+
+async function unblockUser(userId, btn) {
+  btn.textContent = '...'; btn.disabled = true;
+  await sb.from('blocked_users').delete().eq('blocker_id', currentUser.id).eq('blocked_id', userId);
+  showToast('✅ User di-unblock');
+  loadBlockList();
+}
+
+function confirmLogout() {
+  if (confirm('Log out dari VIBES?')) {
+    sb.auth.signOut().then(() => window.location.href = 'auth.html');
+  }
+}
+
+function confirmDeleteAccount() {
+  const confirm1 = confirm('⚠️ Padam akaun? Semua data termasuk video dan coins akan hilang.');
+  if (!confirm1) return;
+  const confirm2 = prompt('Taip "PADAM" untuk mengesahkan:');
+  if (confirm2 === 'PADAM') {
+    showToast('Sila hubungi support@vibes.app untuk padam akaun.');
+  }
+}
+
+function clearCache() {
+  localStorage.clear();
+  sessionStorage.clear();
+  if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  showToast('🗑️ Cache dibersihkan!');
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

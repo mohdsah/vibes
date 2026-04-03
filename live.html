@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#000;--surface:#111;--surface2:#1a1a1a;--border:#2a2a2a;--accent:#ff2d55;--accent2:#ff6b35;--live:#ff3b30;--text:#fff;--muted:#888;--gold:#ffd700}
+    html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--text);overflow:hidden}
+
+    /* ── VIDEO ─────────────────────────── */
+    .video-wrap{position:fixed;inset:0;background:#000}
+    #remoteVideo{width:100%;height:100%;object-fit:cover;display:block}
+    .overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.55) 0%,transparent 22%,transparent 48%,rgba(0,0,0,0.92) 100%);pointer-events:none}
+
+    /* ── TAP LOVE — TikTok style ────────── */
+    /* No tap-zone div needed — we listen on videoWrap directly */
+    .fly-heart{
+      position:absolute;
+      pointer-events:none;
+      z-index:16;
+      font-size:32px;
+      will-change:transform,opacity;
+      animation:tiktokHeart var(--dur, 1.4s) ease-out forwards;
+    }
+    @keyframes tiktokHeart{
+      0%  { opacity:1; transform:translateY(0)     translateX(0)      scale(0.4) rotate(var(--rot)); }
+      15% { opacity:1; transform:translateY(-30px)  translateX(var(--dx1)) scale(1.2) rotate(calc(var(--rot)*-0.5)); }
+      40% { opacity:1; transform:translateY(-90px)  translateX(var(--dx2)) scale(1.0) rotate(var(--rot2)); }
+      70% { opacity:0.7; transform:translateY(-160px) translateX(var(--dx3)) scale(0.8) rotate(var(--rot3)); }
+      100%{ opacity:0;   transform:translateY(-220px) translateX(var(--dx4)) scale(0.5) rotate(var(--rot4)); }
+    }
+    /* ripple on tap */
+    .tap-ripple{
+      position:absolute;pointer-events:none;z-index:16;
+      width:50px;height:50px;border-radius:50%;
+      border:2.5px solid rgba(255,45,85,0.7);
+      transform:translate(-50%,-50%) scale(0);
+      animation:rippleOut 0.45s ease-out forwards;
+    }
+    @keyframes rippleOut{
+      0%  { transform:translate(-50%,-50%) scale(0);   opacity:1; }
+      100%{ transform:translate(-50%,-50%) scale(2.2); opacity:0; }
+    }
+    /* love counter */
+    .love-count{
+      position:absolute;bottom:96px;right:16px;
+      background:rgba(255,45,85,0.9);backdrop-filter:blur(8px);
+      border-radius:20px;padding:5px 14px;
+      font-size:13px;font-weight:700;color:white;
+      display:none;z-index:25;pointer-events:none;
+      box-shadow:0 4px 14px rgba(255,45,85,0.4);
+    }
+    .love-count.show{display:block;animation:popIn 0.18s ease}
+    @keyframes popIn{from{transform:scale(0.7)}to{transform:scale(1)}}
+
+    /* ── TAP TO PLAY ────────────────────── */
+    .tap-to-play{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:rgba(0,0,0,0.75);cursor:pointer}
+    .tap-to-play.hidden{display:none}
+    .tap-play-btn{width:80px;height:80px;background:rgba(255,255,255,0.15);border:3px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;transition:transform 0.15s}
+    .tap-to-play:active .tap-play-btn{transform:scale(0.9)}
+    .tap-play-text{font-size:15px;color:rgba(255,255,255,0.8);font-weight:500}
+
+    /* ── CONNECTING ─────────────────────── */
+    .connecting-overlay{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:rgba(0,0,0,0.85)}
+    .connecting-overlay.hidden{display:none}
+    .spinner{width:40px;height:40px;border:3px solid #333;border-top-color:var(--live);border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .connecting-text{font-size:14px;color:var(--muted)}
+
+    /* ── RECONNECTING BANNER ────────────── */
+    .reconnect-banner{position:absolute;top:70px;left:12px;right:12px;z-index:40;background:rgba(255,165,0,0.85);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;color:#000;display:none}
+    .reconnect-banner.show{display:block;animation:fadeIn 0.3s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+    /* ── CONNECTION STATUS ──────────────── */
+    .conn-status{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(255,59,48,0.85);border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;display:none;z-index:30;white-space:nowrap}
+    .conn-status.show{display:block}
+    .conn-status.ok{background:rgba(34,197,94,0.85)}
+
+    /* ── TOP BAR ────────────────────────── */
+    .live-top{position:absolute;top:0;left:0;right:0;padding:14px 14px 0;display:flex;align-items:center;gap:8px;z-index:20}
+    .back-btn{background:rgba(0,0,0,0.55);border:none;border-radius:50%;width:36px;height:36px;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .host-pill{display:flex;align-items:center;gap:8px;flex:1;min-width:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);border-radius:24px;padding:5px 12px 5px 5px;cursor:pointer;border:1px solid rgba(255,255,255,0.1)}
+    .host-pill img{width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid var(--live);flex-shrink:0}
+    .host-pill-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .host-pill-subs{font-size:10px;color:rgba(255,255,255,0.55)}
+    .live-badge{background:var(--live);color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;letter-spacing:1px;animation:livePulse 2s infinite;flex-shrink:0}
+    @keyframes livePulse{0%,100%{opacity:1}50%{opacity:0.6}}
+    .viewer-badge{background:rgba(0,0,0,0.5);border-radius:20px;padding:4px 9px;font-size:12px;font-weight:600;flex-shrink:0}
+
+    /* ── GIFT TARGET BAR ────────────────── */
+    .gift-target-wrap{position:absolute;top:72px;left:14px;right:14px;z-index:20;display:none}
+    .gift-target-wrap.show{display:block}
+    .gift-target-card{background:rgba(0,0,0,0.65);backdrop-filter:blur(12px);border:1px solid rgba(255,215,0,0.25);border-radius:14px;padding:10px 14px}
+    .target-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+    .target-title-txt{font-size:12px;font-weight:700;color:var(--gold)}
+    .target-amounts{font-size:11px;color:rgba(255,255,255,0.65);font-weight:600}
+    .target-bar-bg{height:7px;background:rgba(255,255,255,0.12);border-radius:10px;overflow:hidden}
+    .target-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9500);border-radius:10px;transition:width 0.5s ease}
+    .target-pct{font-size:10px;color:var(--gold);font-weight:700;margin-top:4px;text-align:right}
+
+    /* ── CHAT ───────────────────────────── */
+    /* ✅ FIX: overflow-y:auto + scroll to bottom */
+    .live-chat{position:absolute;bottom:88px;left:0;right:68px;padding:0 12px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;z-index:20}
+    .live-chat::-webkit-scrollbar{display:none}
+    .chat-msg{display:inline-flex;align-items:flex-start;gap:6px;background:rgba(0,0,0,0.55);backdrop-filter:blur(5px);border-radius:10px;padding:6px 10px;max-width:100%;animation:slideIn 0.3s ease;flex-shrink:0}
+    @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .chat-msg.gift-msg{background:rgba(255,215,0,0.16);border:1px solid rgba(255,215,0,0.3)}
+    .chat-msg.system-msg{background:rgba(255,255,255,0.06)}
+    .chat-msg.sub-msg{background:rgba(255,45,85,0.16);border:1px solid rgba(255,45,85,0.3)}
+    .chat-username{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+    .chat-text{font-size:13px;line-height:1.3;word-break:break-word}
+
+    /* ── GIFT FLOATER ───────────────────── */
+    .gift-floater{position:absolute;pointer-events:none;z-index:300;display:flex;flex-direction:column;align-items:center;gap:4px;animation:giftFloat 3s ease-out forwards}
+    .gift-emoji-big{font-size:54px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5))}
+    .gift-label{font-size:11px;font-weight:700;color:var(--gold);background:rgba(0,0,0,0.65);border-radius:20px;padding:2px 10px;white-space:nowrap}
+    @keyframes giftFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-150px) scale(1.35)}100%{opacity:0;transform:translateY(-240px) scale(0.5)}}
+
+    /* ── SIDEBAR ────────────────────────── */
+    .action-sidebar{position:absolute;bottom:90px;right:10px;display:flex;flex-direction:column;align-items:center;gap:16px;z-index:20}
+    .action-btn{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:white;cursor:pointer}
+    .action-icon{width:46px;height:46px;background:rgba(255,255,255,0.12);backdrop-filter:blur(10px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px}
+    .action-count{font-size:10px;font-weight:600}
+
+    /* ── BOTTOM BAR ─────────────────────── */
+    .live-bottom{position:absolute;bottom:0;left:0;right:0;padding:8px 10px 26px;display:flex;gap:8px;align-items:center;z-index:20}
+    .my-coins-badge{background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.3);border-radius:20px;padding:7px 11px;font-size:13px;font-weight:700;color:var(--gold);display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+    .chat-input{flex:1;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:10px 14px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
+    .chat-input::placeholder{color:rgba(255,255,255,0.45)}
+    .send-btn{width:40px;height:40px;background:var(--accent);border:none;border-radius:50%;color:white;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .gift-btn{width:40px;height:40px;background:linear-gradient(135deg,var(--gold),#ff9500);border:none;border-radius:50%;font-size:20px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+
+    /* ── HOST PROFILE PANEL ─────────────── */
+    .panel-overlay{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.65);display:none}
+    .panel-overlay.open{display:block}
+    .host-panel{position:fixed;bottom:0;left:0;right:0;z-index:401;background:linear-gradient(to bottom,#141414,#0a0a0a);border-radius:24px 24px 0 0;padding:0 0 40px;max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1)}
+    .host-panel::-webkit-scrollbar{display:none}
+    .panel-overlay.open .host-panel{transform:translateY(0)}
+    .panel-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:12px auto 0}
+    .panel-hero{position:relative;height:120px;background:linear-gradient(135deg,#1a0010,#0a0020);overflow:hidden}
+    .panel-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(255,45,85,0.3),transparent 60%),radial-gradient(ellipse at 70% 50%,rgba(99,102,241,0.2),transparent 60%)}
+    .panel-hero-close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.12);border:none;border-radius:50%;width:32px;height:32px;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+    .panel-avatar-area{display:flex;justify-content:center;margin-top:-44px;position:relative;z-index:2}
+    .panel-avatar{width:88px;height:88px;border-radius:50%;object-fit:cover;border:3px solid var(--bg);box-shadow:0 4px 20px rgba(0,0,0,0.5);cursor:pointer}
+    .panel-live-ring{position:absolute;inset:-4px;border-radius:50%;border:3px solid var(--live);animation:liveRing 2s ease-in-out infinite}
+    @keyframes liveRing{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.05)}}
+    .panel-body{padding:12px 20px 0;text-align:center}
+    .panel-name{font-size:20px;font-weight:800;margin-bottom:4px}
+    .panel-username{font-size:13px;color:var(--muted);margin-bottom:10px}
+    .panel-bio{font-size:13px;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:14px}
+    .panel-rank-area{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:14px;padding:14px;background:var(--surface2);border-radius:16px}
+    .my-rank-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+    .my-rank-display{font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px}
+    .rank-progress-wrap{width:100%}
+    .rank-progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
+    .rank-progress-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden}
+    .rank-progress-fill{height:100%;border-radius:10px;transition:width 0.5s}
+    .panel-stats{display:flex;justify-content:center;margin-bottom:14px;background:var(--surface2);border-radius:16px;overflow:hidden}
+    .panel-stat{flex:1;padding:14px 8px;text-align:center;border-right:1px solid var(--border)}
+    .panel-stat:last-child{border-right:none}
+    .panel-stat-num{font-size:18px;font-weight:800}
+    .panel-stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+    .panel-btns{display:flex;gap:10px;margin-bottom:14px}
+    .btn-subscribe{flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:12px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+    .btn-subscribe.subscribed{background:rgba(255,255,255,0.1);border:1px solid var(--border);color:var(--muted)}
+    .btn-follow-panel{flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-follow-panel.following{color:var(--accent);border-color:var(--accent)}
+    .panel-target{background:var(--surface2);border-radius:16px;padding:14px;margin-bottom:14px}
+    .panel-target-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .panel-target-title-txt{font-size:13px;font-weight:700;color:var(--gold)}
+    .panel-target-pct{font-size:13px;font-weight:800;color:var(--gold)}
+    .panel-target-bar-bg{height:10px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-bottom:6px}
+    .panel-target-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9500);border-radius:10px;transition:width 0.6s}
+    .panel-target-amounts{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+    .send-gift-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),#ff9500);border:none;border-radius:12px;color:#000;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:800;cursor:pointer}
+
+    /* ✅ NEW: Top Gifters in viewer panel */
+    .panel-gifters{background:var(--surface2);border-radius:16px;padding:14px;margin-bottom:14px}
+    .panel-gifters-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .pg-item{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .pg-rank{width:22px;font-size:14px;font-weight:800;color:var(--muted);text-align:center;flex-shrink:0}
+    .pg-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+    .pg-name{flex:1;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pg-coins{font-size:13px;font-weight:800;color:var(--gold);flex-shrink:0}
+
+    /* ── GIFT DRAWER ─────────────────────── */
+    .gift-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.65);display:none}
+    .gift-overlay.open{display:block}
+    .gift-drawer{position:fixed;bottom:0;left:0;right:0;z-index:501;background:#1a1a1a;border-radius:22px 22px 0 0;padding:16px 16px 40px;max-height:65vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1)}
+    .gift-drawer::-webkit-scrollbar{display:none}
+    .gift-drawer.open{transform:translateY(0)}
+    .gift-drawer-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .gift-drawer-title{font-size:16px;font-weight:700}
+    .my-coins-disp{font-size:14px;color:var(--gold);font-weight:800}
+    .close-gift-btn{background:rgba(255,255,255,0.1);border:none;border-radius:50%;width:30px;height:30px;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .drawer-rank-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 12px;margin-bottom:14px}
+    .drawer-rank-label{font-size:12px;color:var(--muted)}
+    .gift-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .gift-item{display:flex;flex-direction:column;align-items:center;gap:5px;background:#222;border-radius:14px;padding:12px 6px;cursor:pointer;transition:all 0.15s;border:2px solid transparent}
+    .gift-item:active{transform:scale(0.92)}
+    .gift-item.selected{border-color:var(--gold);background:rgba(255,215,0,0.1)}
+    .gift-item.cant-afford{opacity:0.3}
+    .gift-emoji-sm{font-size:30px}
+    .gift-name-sm{font-size:10px;font-weight:700;text-align:center}
+    .gift-cost-sm{font-size:11px;color:var(--gold);font-weight:800}
+    .send-gift-drawer-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),#ff9500);border:none;border-radius:14px;color:#000;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:800;cursor:pointer}
+    .send-gift-drawer-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* ── OVERLAYS ────────────────────────── */
+    .ended-overlay{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.93);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:32px}
+    .ended-overlay.show{display:flex}
+    .ended-btn{background:var(--accent);border:none;border-radius:12px;color:white;padding:14px 32px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
+
+    /* Toast */
+    .toast{position:fixed;top:76px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;color:white;z-index:800;display:none;white-space:nowrap;pointer-events:none}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+    .target-complete-flash{position:fixed;inset:0;z-index:900;pointer-events:none;display:none;align-items:center;justify-content:center}
+    .target-complete-flash.show{display:flex;animation:flashIn 0.5s ease}
+    @keyframes flashIn{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
+    .target-complete-card{background:linear-gradient(135deg,#1a1400,#2a2000);border:2px solid var(--gold);border-radius:20px;padding:28px 32px;text-align:center}
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+<div class="target-complete-flash" id="targetFlash">
+  <div class="target-complete-card">
+    <div style="font-size:56px">🎯</div>
+    <div style="font-size:20px;font-weight:800;color:var(--gold);margin-top:8px">Target Gift Tercapai! 🎉</div>
+  </div>
+</div>
+
+<!-- VIDEO WRAP -->
+<div class="video-wrap" id="videoWrap">
+  <video id="remoteVideo" autoplay muted playsinline></video>
+  <div class="overlay"></div>
+  <!-- Love count badge (bottom right) -->
+  <div class="love-count" id="loveCount">❤️ 0</div>
+
+  <!-- Tap to play overlay -->
+  <div class="tap-to-play" id="tapToPlay" onclick="startWatching()">
+    <div class="tap-play-btn">▶</div>
+    <div class="tap-play-text">Tap untuk mula tonton</div>
+  </div>
+
+  <!-- Connecting -->
+  <div class="connecting-overlay" id="connectingOverlay">
+    <div class="spinner"></div>
+    <div class="connecting-text" id="connectingText">Menyambung ke live...</div>
+  </div>
+
+  <!-- ✅ NEW: Reconnecting banner -->
+  <div class="reconnect-banner" id="reconnectBanner">🔄 Menyambung semula...</div>
+
+  <!-- Connection status -->
+  <div class="conn-status" id="connStatus"></div>
+
+  <!-- TOP BAR -->
+  <div class="live-top">
+    <button class="back-btn" onclick="leaveLive()">←</button>
+    <div class="host-pill" onclick="openHostPanel()">
+      <img id="hostAvatarTop" src="" alt=""/>
+      <div>
+        <div class="host-pill-name" id="hostNameTop">...</div>
+        <div class="host-pill-subs" id="hostSubsTop">0 langgan</div>
+      </div>
+    </div>
+    <span class="live-badge">LIVE</span>
+    <span class="viewer-badge">👁 <span id="viewerCount">0</span></span>
+  </div>
+
+  <!-- GIFT TARGET -->
+  <div class="gift-target-wrap" id="giftTargetWrap">
+    <div class="gift-target-card">
+      <div class="target-row">
+        <div class="target-title-txt">🎯 <span id="targetTitleTop">Target</span></div>
+        <div class="target-amounts">💎 <span id="targetCurrentTop">0</span> / <span id="targetGoalTop">0</span></div>
+      </div>
+      <div class="target-bar-bg"><div class="target-bar-fill" id="targetBarTop" style="width:0%"></div></div>
+      <div class="target-pct"><span id="targetPctTop">0</span>%</div>
+    </div>
+  </div>
+
+  <!-- CHAT — scrollable -->
+  <div class="live-chat" id="liveChat"></div>
+
+  <!-- SIDEBAR -->
+  <div class="action-sidebar">
+    <button class="action-btn" onclick="openHostPanel()">
+      <div class="action-icon">👤</div>
+      <span class="action-count">Profil</span>
+    </button>
+    <button class="action-btn" onclick="openGiftDrawer()">
+      <div class="action-icon">🎁</div>
+      <span class="action-count">Gift</span>
+    </button>
+    <!-- ✅ NEW: Share link -->
+    <button class="action-btn" onclick="shareLiveLink()">
+      <div class="action-icon">🔗</div>
+      <span class="action-count">Share</span>
+    </button>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="live-bottom">
+    <div class="my-coins-badge" onclick="window.location.href='topup.html'">
+      💎 <span id="myCoinsDisplay">0</span>
+    </div>
+    <input class="chat-input" id="chatInput" placeholder="Say something..."/>
+    <button class="send-btn" onclick="sendChat()">➤</button>
+    <button class="gift-btn" onclick="openGiftDrawer()">🎁</button>
+  </div>
+</div>
+
+<!-- HOST PROFILE PANEL -->
+<div class="panel-overlay" id="panelOverlay" onclick="closePanelOverlay(event)">
+  <div class="host-panel" id="hostPanel">
+    <div class="panel-handle"></div>
+    <div class="panel-hero">
+      <div class="panel-hero-bg"></div>
+      <button class="panel-hero-close" onclick="closeHostPanel()">✕</button>
+    </div>
+    <div class="panel-avatar-area">
+      <div style="position:relative;display:inline-block">
+        <div class="panel-live-ring"></div>
+        <img class="panel-avatar" id="panelAvatar" src="" alt="" onclick="window.location.href='profile.html?id='+hostProfile?.id"/>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="panel-name" id="panelName">...</div>
+      <div class="panel-username" id="panelUsername">...</div>
+      <div class="panel-bio" id="panelBio"></div>
+
+      <div class="panel-rank-area">
+        <div class="my-rank-label">Dilet Rank Kau</div>
+        <div class="my-rank-display" id="panelRankDisplay">—</div>
+        <div class="rank-progress-wrap" id="panelRankProgress" style="display:none">
+          <div class="rank-progress-label"><span id="rankCurrent"></span><span id="rankNext"></span></div>
+          <div class="rank-progress-bar"><div class="rank-progress-fill" id="rankFill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="panel-stats">
+        <div class="panel-stat"><div class="panel-stat-num" id="panelFollowers">0</div><div class="panel-stat-label">Followers</div></div>
+        <div class="panel-stat"><div class="panel-stat-num" id="panelSubscribers">0</div><div class="panel-stat-label">Langgan</div></div>
+        <div class="panel-stat"><div class="panel-stat-num" id="panelVideos">0</div><div class="panel-stat-label">Video</div></div>
+      </div>
+
+      <div class="panel-btns">
+        <button class="btn-subscribe" id="panelSubscribeBtn" onclick="toggleSubscribe()">🔔 Langgan</button>
+        <button class="btn-follow-panel" id="panelFollowBtn" onclick="toggleFollow()">Follow</button>
+      </div>
+
+      <!-- ✅ NEW: Top Gifters in panel -->
+      <div class="panel-gifters" id="panelGifters" style="display:none">
+        <div class="panel-gifters-title">🏆 Top Gifters Sesi Ini</div>
+        <div id="panelGiftersList"></div>
+      </div>
+
+      <div class="panel-target" id="panelTarget" style="display:none">
+        <div class="panel-target-header">
+          <div class="panel-target-title-txt">🎯 <span id="panelTargetName">Target</span></div>
+          <div class="panel-target-pct"><span id="panelTargetPct">0</span>%</div>
+        </div>
+        <div class="panel-target-bar-bg"><div class="panel-target-bar-fill" id="panelTargetFill" style="width:0%"></div></div>
+        <div class="panel-target-amounts">
+          <span>💎 <span id="panelTargetCurrent">0</span></span>
+          <span>/ <span id="panelTargetGoal">0</span></span>
+        </div>
+      </div>
+
+      <button class="send-gift-btn" onclick="closeHostPanel(); openGiftDrawer()" style="margin-top:4px">🎁 Hantar Gift</button>
+    </div>
+  </div>
+</div>
+
+<!-- GIFT DRAWER -->
+<div class="gift-overlay" id="giftOverlay" onclick="closeGiftDrawer()"></div>
+<div class="gift-drawer" id="giftDrawer">
+  <div class="gift-drawer-header">
+    <span class="gift-drawer-title">🎁 Hantar Gift</span>
+    <span class="my-coins-disp">💎 <span id="myCoinsDrawer">0</span></span>
+    <button class="close-gift-btn" onclick="closeGiftDrawer()">✕</button>
+  </div>
+  <div class="drawer-rank-row">
+    <span class="drawer-rank-label">Rank kau:</span>
+    <span id="drawerMyRank">—</span>
+  </div>
+  <div class="gift-grid" id="giftGrid">
+    <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted)">Loading...</div>
+  </div>
+  <button class="send-gift-drawer-btn" id="sendGiftBtn" onclick="sendGift()" disabled>Pilih gift dulu</button>
+</div>
+
+<div class="ended-overlay" id="endedOverlay">
+  <div style="font-size:60px">😔</div>
+  <div style="font-size:22px;font-weight:700">Live Dah Tamat</div>
+  <div style="font-size:14px;color:var(--muted)">Terima kasih kerana menonton!</div>
+  <button class="ended-btn" onclick="window.location.href='index.html'">Kembali ke Feed</button>
+</div>
+
+<script>
+// ── STATE ───────────────────────────────────────
+let currentUser = null, currentProfile = null;
+let roomId = null, hostProfile = null;
+let localPc = null;
+let sigChannel = null, chatChannel = null;
+let myViewerId = null;
+let myCoins = 0, myCoinsSpent = 0;
+let giftTypes = [], selectedGift = null;
+let isFollowing = false, isSubscribed = false;
+let viewerCount = 0, isSendingGift = false;
+let giftTarget = null;
+let iceCandidateBuffer = [];
+let hasRemoteDesc = false;
+let videoStarted = false;
+
+// ✅ Top gifters tracked from realtime events: { id: { name, avatar, coins } }
+let sessionGifters = {};
+
+// ✅ FIX: Reconnect state
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 5;
+let reconnectTimer = null;
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ]
+};
+
+function showToast(msg, ms=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function setConnStatus(msg, isOk=false) {
+  const el = document.getElementById('connStatus');
+  el.textContent = msg;
+  el.className = 'conn-status show' + (isOk ? ' ok' : '');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── INIT ────────────────────────────────────────
+async function init() {
+  currentUser = await getCurrentUser();
+  if (currentUser) currentProfile = await getCurrentProfile();
+  myViewerId = currentUser?.id || ('guest-' + Math.random().toString(36).substr(2, 9));
+
+  const params = new URLSearchParams(window.location.search);
+  roomId = params.get('id');
+  if (!roomId) return window.location.href = 'live-list.html';
+
+  const { data: room } = await sb.from('live_rooms').select('*, profiles(*)').eq('id', roomId).single();
+  if (!room || room.status === 'ended') {
+    document.getElementById('connectingOverlay').classList.add('hidden');
+    document.getElementById('endedOverlay').classList.add('show');
+    return;
+  }
+
+  hostProfile = room.profiles;
+  viewerCount = room.viewer_count || 0;
+
+  document.getElementById('hostAvatarTop').src = getAvatarUrl(hostProfile);
+  document.getElementById('hostNameTop').textContent = '@' + hostProfile.username;
+  document.getElementById('hostSubsTop').textContent = formatCount(hostProfile.subscribers_count || 0) + ' langgan';
+  document.getElementById('viewerCount').textContent = viewerCount;
+
+  await initWallet();
+
+  const { data: gifts } = await sb.from('gift_types').select('*').eq('is_active', true).order('coin_cost');
+  giftTypes = gifts || [];
+
+  await loadGiftTarget();
+
+  if (currentUser) {
+    const [{ data: f }, { data: s }] = await Promise.all([
+      sb.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', hostProfile.id).maybeSingle(),
+      sb.from('subscriptions').select('id').eq('subscriber_id', currentUser.id).eq('creator_id', hostProfile.id).maybeSingle()
+    ]);
+    isFollowing = !!f; isSubscribed = !!s;
+  }
+
+  subscribeRealtime();
+  await connectToLive();
+  subscribeGifts();
+  subscribeRoomStatus();
+}
+
+async function initWallet() {
+  if (!currentUser) return;
+  let { data: w } = await sb.from('user_coins').select('*').eq('user_id', currentUser.id).maybeSingle();
+  if (!w) {
+    const { data: nw } = await sb.from('user_coins').insert({ user_id: currentUser.id, coins: 0, total_earned: 0, total_coins_spent: 0 }).select().single();
+    w = nw;
+  }
+  myCoins = w?.coins || 0;
+  myCoinsSpent = w?.total_coins_spent || 0;
+  document.getElementById('myCoinsDisplay').textContent = formatCount(myCoins);
+  document.getElementById('myCoinsDrawer').textContent = formatCount(myCoins);
+}
+
+async function loadGiftTarget() {
+  const { data } = await sb.from('gift_targets').select('*').eq('room_id', roomId).eq('is_completed', false).maybeSingle();
+  giftTarget = data;
+  updateTargetUI();
+}
+
+function updateTargetUI() {
+  if (!giftTarget) { document.getElementById('giftTargetWrap').classList.remove('show'); document.getElementById('panelTarget').style.display = 'none'; return; }
+  const pct = Math.min(100, Math.round((giftTarget.current_coins / giftTarget.target_coins) * 100));
+  document.getElementById('giftTargetWrap').classList.add('show');
+  document.getElementById('targetTitleTop').textContent = giftTarget.title;
+  document.getElementById('targetCurrentTop').textContent = formatCount(giftTarget.current_coins);
+  document.getElementById('targetGoalTop').textContent = formatCount(giftTarget.target_coins);
+  document.getElementById('targetBarTop').style.width = pct + '%';
+  document.getElementById('targetPctTop').textContent = pct;
+  document.getElementById('panelTarget').style.display = 'block';
+  document.getElementById('panelTargetName').textContent = giftTarget.title;
+  document.getElementById('panelTargetCurrent').textContent = formatCount(giftTarget.current_coins);
+  document.getElementById('panelTargetGoal').textContent = formatCount(giftTarget.target_coins);
+  document.getElementById('panelTargetFill').style.width = pct + '%';
+  document.getElementById('panelTargetPct').textContent = pct;
+}
+
+// ── WEBRTC ────────────────────────────────────
+async function connectToLive() {
+  if (localPc) { try { localPc.close(); } catch(e) {} localPc = null; }
+  iceCandidateBuffer = [];
+  hasRemoteDesc = false;
+
+  localPc = new RTCPeerConnection(ICE_SERVERS);
+
+  localPc.ontrack = (event) => {
+    const video = document.getElementById('remoteVideo');
+    if (event.streams?.[0]) video.srcObject = event.streams[0];
+    else {
+      let stream = video.srcObject;
+      if (!stream) { stream = new MediaStream(); video.srcObject = stream; }
+      stream.addTrack(event.track);
+    }
+    video.play().then(() => {
+      videoStarted = true;
+      document.getElementById('connectingOverlay').classList.add('hidden');
+      document.getElementById('tapToPlay').classList.add('hidden');
+      setConnStatus('🔴 Live terhubung!', true);
+      reconnectAttempts = 0; // reset on success
+      hidReconnectBanner();
+    }).catch(() => {
+      document.getElementById('connectingOverlay').classList.add('hidden');
+      document.getElementById('tapToPlay').classList.remove('hidden');
+    });
+  };
+
+  localPc.onicecandidate = ({ candidate }) => {
+    if (candidate) sigChannel?.send({ type: 'broadcast', event: 'ice-from-viewer', payload: { from: myViewerId, candidate: candidate.toJSON() } });
+  };
+
+  localPc.onconnectionstatechange = () => {
+    console.log('Connection state:', localPc.connectionState);
+    if (localPc.connectionState === 'connected') {
+      setConnStatus('🟢 Berjaya!', true);
+      reconnectAttempts = 0;
+      hidReconnectBanner();
+    } else if (localPc.connectionState === 'failed') {
+      setConnStatus('❌ Sambungan gagal');
+      // ✅ FIX: Auto reconnect
+      scheduleReconnect();
+    } else if (localPc.connectionState === 'disconnected') {
+      setConnStatus('⚠️ Sambungan terputus...');
+      scheduleReconnect();
+    }
+  };
+
+  // Signaling channel
+  if (sigChannel) { try { sb.removeChannel(sigChannel); } catch(e) {} }
+  sigChannel = sb.channel(`webrtc-sig-${roomId}`, { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'offer' }, async ({ payload }) => {
+      if (payload.to !== myViewerId) return;
+      try {
+        await localPc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.sdp }));
+        hasRemoteDesc = true;
+        for (const c of iceCandidateBuffer) await localPc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        iceCandidateBuffer = [];
+        const answer = await localPc.createAnswer();
+        await localPc.setLocalDescription(answer);
+        await sigChannel.send({ type: 'broadcast', event: 'answer', payload: { from: myViewerId, sdp: answer.sdp } });
+      } catch(e) { console.error('Handle offer error:', e); }
+    })
+    .on('broadcast', { event: 'ice-from-host' }, async ({ payload }) => {
+      if (payload.to !== myViewerId || !payload.candidate) return;
+      try {
+        if (hasRemoteDesc && localPc.remoteDescription) await localPc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        else iceCandidateBuffer.push(payload.candidate);
+      } catch(e) {}
+    })
+    .on('broadcast', { event: 'live-ended' }, () => showLiveEnded())
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await sigChannel.send({ type: 'broadcast', event: 'viewer-join', payload: { viewerId: myViewerId } });
+        // ✅ FIX: Notify via chat channel for viewer count
+        chatChannel?.send({ type: 'broadcast', event: 'viewer-joined', payload: { viewerId: myViewerId } });
+        if (currentUser) sb.from('live_rooms').update({ viewer_count: (viewerCount || 0) + 1 }).eq('id', roomId);
+      }
+    });
+}
+
+// ✅ FIX: Auto reconnect with exponential backoff
+function scheduleReconnect() {
+  if (reconnectAttempts >= MAX_RECONNECT) {
+    setConnStatus('❌ Gagal sambung semula');
+    return;
+  }
+  clearTimeout(reconnectTimer);
+  const delay = Math.min(2000 * Math.pow(2, reconnectAttempts), 15000);
+  reconnectAttempts++;
+  showReconnectBanner(reconnectAttempts, MAX_RECONNECT);
+  reconnectTimer = setTimeout(async () => {
+    console.log(`Reconnect attempt ${reconnectAttempts}`);
+    await connectToLive();
+  }, delay);
+}
+
+function showReconnectBanner(attempt, max) {
+  const el = document.getElementById('reconnectBanner');
+  el.textContent = `🔄 Menyambung semula... (${attempt}/${max})`;
+  el.classList.add('show');
+}
+
+function hidReconnectBanner() {
+  document.getElementById('reconnectBanner').classList.remove('show');
+}
+
+// ── CHAT ─────────────────────────────────────
+function subscribeRealtime() {
+  chatChannel = sb.channel(`live-chat-${roomId}`)
+    .on('broadcast', { event: 'message' }, ({ payload }) => {
+      addChatMsg(payload.username, payload.text, false, payload.isSystem);
+    })
+    // ✅ Viewer count via broadcast
+    .on('broadcast', { event: 'viewer-joined' }, () => {
+      viewerCount++;
+      document.getElementById('viewerCount').textContent = viewerCount;
+    })
+    .on('broadcast', { event: 'viewer-left' }, () => {
+      viewerCount = Math.max(0, viewerCount - 1);
+      document.getElementById('viewerCount').textContent = viewerCount;
+    })
+    // ✅ Love taps from other viewers — same TikTok style
+    .on('broadcast', { event: 'love-tap' }, ({ payload }) => {
+      if (!payload?.count) return;
+      for (let i = 0; i < Math.min(payload.count, 3); i++) {
+        setTimeout(() => {
+          const x = 30 + Math.random() * (window.innerWidth - 60);
+          const y = window.innerHeight - 160 - Math.random() * 80;
+          spawnHearts(x, y);
+        }, i * 120);
+      }
+      loveTotal += payload.count;
+      showLoveCount();
+    })
+    .subscribe();
+
+  initTapLove();
+}
+
+function addChatMsg(username, text, isGift=false, isSystem=false) {
+  const chat = document.getElementById('liveChat');
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isGift ? ' gift-msg' : '') + (isSystem ? ' system-msg' : '');
+  if (isSystem) div.innerHTML = `<span class="chat-text" style="color:rgba(255,255,255,0.45)">${text}</span>`;
+  else div.innerHTML = `<span class="chat-username">${username}</span><span class="chat-text">${text}</span>`;
+  chat.appendChild(div);
+  // ✅ FIX: Auto scroll to bottom
+  chat.scrollTop = chat.scrollHeight;
+  // Keep max 50 msgs
+  while (chat.children.length > 50) chat.removeChild(chat.firstChild);
+}
+
+async function sendChat() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  chatChannel?.send({ type: 'broadcast', event: 'message', payload: { username: currentProfile?.username || 'Guest', text } });
+  addChatMsg(currentProfile?.username || 'You', text);
+}
+
+// ✅ NEW: Share live link
+async function shareLiveLink() {
+  const url = window.location.href;
+  if (navigator.share) navigator.share({ title: `${hostProfile?.display_name || hostProfile?.username} tengah LIVE!`, text: '🔴 Jom tonton!', url });
+  else { await navigator.clipboard.writeText(url); showToast('🔗 Link disalin!'); }
+}
+
+// ── GIFTS ────────────────────────────────────
+function subscribeGifts() {
+  sb.channel(`gifts-viewer-${roomId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_gifts', filter: `room_id=eq.${roomId}` }, async ({ new: gift }) => {
+      const gt = giftTypes.find(g => g.id === gift.gift_type_id);
+      if (!gt) return;
+      const { data: sender } = await sb.from('profiles').select('id,username,display_name,avatar_url').eq('id', gift.sender_id).maybeSingle();
+      const sname = sender?.username || 'Someone';
+      showGiftAnimation(gt.emoji, sname, gt.name);
+      addChatMsg(sname, `🎁 ${gt.name} ${gt.emoji} (${gt.coin_cost} 💎)`, true);
+
+      // ✅ NEW: Track top gifters
+      if (sender) {
+        const id = sender.id;
+        if (!sessionGifters[id]) sessionGifters[id] = { name: sender.display_name || sender.username, username: sender.username, avatar: getAvatarUrl(sender), coins: 0 };
+        sessionGifters[id].coins += gift.coin_amount;
+      }
+
+      if (giftTarget && !giftTarget.is_completed) {
+        giftTarget.current_coins += gift.coin_amount;
+        if (giftTarget.current_coins >= giftTarget.target_coins) { giftTarget.is_completed = true; showTargetComplete(); }
+        updateTargetUI();
+      }
+    })
+    .subscribe();
+}
+
+function subscribeRoomStatus() {
+  sb.channel(`room-status-${roomId}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_rooms', filter: `id=eq.${roomId}` }, ({ new: r }) => {
+      if (r.status === 'ended') showLiveEnded();
+      if (r.viewer_count !== undefined) document.getElementById('viewerCount').textContent = r.viewer_count;
+    })
+    .subscribe();
+  sb.channel(`live-end-broadcast-${roomId}`)
+    .on('broadcast', { event: 'live-ended' }, () => showLiveEnded())
+    .subscribe();
+}
+
+function showLiveEnded() {
+  if (document.getElementById('endedOverlay').classList.contains('show')) return;
+  document.getElementById('videoWrap').style.display = 'none';
+  document.getElementById('endedOverlay').classList.add('show');
+  if (localPc) { try { localPc.close(); } catch(e) {} localPc = null; }
+  try { sb.removeAllChannels(); } catch(e) {}
+}
+
+function showGiftAnimation(emoji, username, name) {
+  const el = document.createElement('div');
+  el.className = 'gift-floater';
+  el.style.left = (8 + Math.random() * 65) + '%';
+  el.style.bottom = '100px';
+  el.innerHTML = `<div class="gift-emoji-big">${emoji}</div><div class="gift-label">${username}: ${name}</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+function showTargetComplete() {
+  const el = document.getElementById('targetFlash');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── TAP TO PLAY ──────────────────────────────
+function startWatching() {
+  const video = document.getElementById('remoteVideo');
+  video.muted = false;
+  video.play().then(() => {
+    videoStarted = true;
+    document.getElementById('tapToPlay').classList.add('hidden');
+    setConnStatus('🔴 Live terhubung!', true);
+  }).catch(() => {
+    video.muted = true;
+    video.play().then(() => {
+      videoStarted = true;
+      document.getElementById('tapToPlay').classList.add('hidden');
+      showToast('🔇 Video muted. Tap 🔊 untuk unmute.');
+    });
+  });
+}
+
+// ── GIFT DRAWER ───────────────────────────────
+function renderGiftGrid() {
+  document.getElementById('drawerMyRank').innerHTML = renderRankBadge(myCoinsSpent);
+  const grid = document.getElementById('giftGrid');
+  if (!giftTypes.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted)">Tiada gift</div>'; return; }
+  grid.innerHTML = giftTypes.map(g => {
+    const cant = myCoins < g.coin_cost;
+    return `<div class="gift-item ${cant ? 'cant-afford' : ''}" id="gi_${g.id}" onclick="selectGift('${g.id}',${cant})">
+      <div class="gift-emoji-sm">${g.emoji}</div>
+      <div class="gift-name-sm">${g.name}</div>
+      <div class="gift-cost-sm">💎${g.coin_cost}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectGift(id, cantAfford) {
+  if (cantAfford) { closeGiftDrawer(); showToast('💎 Coins tak cukup!'); setTimeout(() => window.location.href = 'topup.html', 1200); return; }
+  selectedGift = giftTypes.find(g => g.id === id);
+  if (!selectedGift) return;
+  document.querySelectorAll('.gift-item').forEach(e => e.classList.remove('selected'));
+  document.getElementById('gi_' + id)?.classList.add('selected');
+  const btn = document.getElementById('sendGiftBtn');
+  btn.disabled = false;
+  btn.textContent = `Send ${selectedGift.emoji} ${selectedGift.name} — 💎${selectedGift.coin_cost}`;
+}
+
+async function sendGift() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  if (!selectedGift || isSendingGift) return;
+  isSendingGift = true;
+  const btn = document.getElementById('sendGiftBtn');
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  const { error } = await sb.from('live_gifts').insert({
+    room_id: roomId, sender_id: currentUser.id,
+    receiver_id: hostProfile.id, gift_type_id: selectedGift.id,
+    coin_amount: selectedGift.coin_cost
+  });
+
+  if (error) {
+    showToast(error.message?.includes('Insufficient') ? '💎 Coins tak cukup!' : 'Error: ' + error.message, 3000);
+    btn.disabled = false; btn.textContent = `Send ${selectedGift.emoji} ${selectedGift.name} — 💎${selectedGift.coin_cost}`;
+    isSendingGift = false; return;
+  }
+
+  myCoins = Math.max(0, myCoins - selectedGift.coin_cost);
+  myCoinsSpent += selectedGift.coin_cost;
+  document.getElementById('myCoinsDisplay').textContent = formatCount(myCoins);
+  document.getElementById('myCoinsDrawer').textContent = formatCount(myCoins);
+  closeGiftDrawer();
+  showToast(`${selectedGift.emoji} Gift sent!`);
+  selectedGift = null;
+  btn.disabled = true; btn.textContent = 'Pilih gift dulu';
+  isSendingGift = false;
+}
+
+function openGiftDrawer() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  renderGiftGrid();
+  document.getElementById('giftOverlay').classList.add('open');
+  document.getElementById('giftDrawer').classList.add('open');
+}
+function closeGiftDrawer() {
+  document.getElementById('giftOverlay').classList.remove('open');
+  document.getElementById('giftDrawer').classList.remove('open');
+}
+
+// ── HOST PANEL ────────────────────────────────
+function openHostPanel() {
+  document.getElementById('panelAvatar').src = getAvatarUrl(hostProfile);
+  document.getElementById('panelName').textContent = hostProfile.display_name || hostProfile.username;
+  document.getElementById('panelUsername').textContent = '@' + hostProfile.username;
+  document.getElementById('panelBio').textContent = hostProfile.bio || '';
+  document.getElementById('panelFollowers').textContent = formatCount(hostProfile.followers_count);
+  document.getElementById('panelSubscribers').textContent = formatCount(hostProfile.subscribers_count || 0);
+  document.getElementById('panelVideos').textContent = formatCount(hostProfile.videos_count);
+
+  const rank = getDiletRank(myCoinsSpent);
+  const nextRank = getNextRank(myCoinsSpent);
+  const pct = getRankProgress(myCoinsSpent);
+  document.getElementById('panelRankDisplay').innerHTML = `<span style="font-size:28px">${rank.emoji}</span><span style="color:${rank.color}">${rank.name}</span>`;
+  if (nextRank) {
+    document.getElementById('panelRankProgress').style.display = 'block';
+    document.getElementById('rankCurrent').textContent = rank.name;
+    document.getElementById('rankNext').textContent = nextRank.name + ' (💎' + formatCount(nextRank.min) + ')';
+    const fill = document.getElementById('rankFill');
+    fill.style.width = pct + '%';
+    fill.style.background = `linear-gradient(90deg,${rank.color},${nextRank.color})`;
+  }
+
+  updateSubscribeBtn(); updateFollowBtn();
+  updateTargetUI();
+
+  // ✅ NEW: Show top gifters in panel
+  const sorted = Object.values(sessionGifters).sort((a, b) => b.coins - a.coins);
+  const giftersEl = document.getElementById('panelGifters');
+  if (sorted.length > 0) {
+    giftersEl.style.display = 'block';
+    const medals = ['🥇','🥈','🥉'];
+    document.getElementById('panelGiftersList').innerHTML = sorted.slice(0, 5).map((g, i) => `
+      <div class="pg-item">
+        <div class="pg-rank">${medals[i] || (i + 1)}</div>
+        <img class="pg-avatar" src="${g.avatar}" alt="${g.name}" />
+        <div class="pg-name">${g.name}</div>
+        <div class="pg-coins">💎${formatCount(g.coins)}</div>
+      </div>`).join('');
+  } else {
+    giftersEl.style.display = 'none';
+  }
+
+  document.getElementById('panelOverlay').classList.add('open');
+}
+
+function closeHostPanel() { document.getElementById('panelOverlay').classList.remove('open'); }
+function closePanelOverlay(e) { if (e.target === e.currentTarget) closeHostPanel(); }
+
+async function toggleSubscribe() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  if (isSubscribed) {
+    await sb.from('subscriptions').delete().eq('subscriber_id', currentUser.id).eq('creator_id', hostProfile.id);
+    isSubscribed = false; showToast('Batal langgan');
+  } else {
+    await sb.from('subscriptions').insert({ subscriber_id: currentUser.id, creator_id: hostProfile.id });
+    isSubscribed = true; showToast('🔔 Kau kini melanggan @' + hostProfile.username + '!');
+    chatChannel?.send({ type: 'broadcast', event: 'message', payload: { username: currentProfile?.username, text: '🔔 baru melanggan!' } });
+  }
+  hostProfile.subscribers_count = (hostProfile.subscribers_count || 0) + (isSubscribed ? 1 : -1);
+  document.getElementById('panelSubscribers').textContent = formatCount(hostProfile.subscribers_count);
+  document.getElementById('hostSubsTop').textContent = formatCount(hostProfile.subscribers_count) + ' langgan';
+  updateSubscribeBtn();
+}
+
+async function toggleFollow() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  if (isFollowing) {
+    await sb.from('follows').delete().eq('follower_id', currentUser.id).eq('following_id', hostProfile.id);
+    isFollowing = false;
+    hostProfile.followers_count = Math.max(0, (hostProfile.followers_count || 1) - 1);
+  } else {
+    await sb.from('follows').insert({ follower_id: currentUser.id, following_id: hostProfile.id });
+    isFollowing = true;
+    hostProfile.followers_count = (hostProfile.followers_count || 0) + 1;
+    showToast('✅ Following @' + hostProfile.username);
+  }
+  document.getElementById('panelFollowers').textContent = formatCount(hostProfile.followers_count);
+  updateFollowBtn();
+}
+
+function updateSubscribeBtn() {
+  const btn = document.getElementById('panelSubscribeBtn');
+  btn.className = 'btn-subscribe' + (isSubscribed ? ' subscribed' : '');
+  btn.innerHTML = isSubscribed ? '🔕 Melanggan' : '🔔 Langgan';
+}
+function updateFollowBtn() {
+  const btn = document.getElementById('panelFollowBtn');
+  btn.textContent = isFollowing ? '✓ Following' : 'Follow';
+  btn.className = 'btn-follow-panel' + (isFollowing ? ' following' : '');
+}
+
+// ── LEAVE ─────────────────────────────────────
+async function leaveLive() {
+  clearTimeout(reconnectTimer);
+  chatChannel?.send({ type: 'broadcast', event: 'viewer-left', payload: {} });
+  if (currentUser) sb.from('live_rooms').update({ viewer_count: Math.max(0, viewerCount - 1) }).eq('id', roomId);
+  if (localPc) { localPc.close(); localPc = null; }
+  try { sb.removeAllChannels(); } catch(e) {}
+  history.back();
+}
+
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+// ── TAP LOVE ──────────────────────────────────
+const HEARTS = ['❤️','🧡','💛','💜','🩷','🤍','💗','💖','💝'];
+let loveTotal = 0;
+let loveCountTimer = null;
+let loveBroadcastBuffer = 0;
+let loveBroadcastTimer = null;
+
+function initTapLove() {
+  const wrap = document.getElementById('videoWrap');
+  if (!wrap) return;
+
+  // UI element selectors to IGNORE taps on
+  const UI_SELECTORS = [
+    '.live-top', '.live-bottom', '.action-sidebar',
+    '.gift-target-wrap', '.live-chat',
+    '.tap-to-play', '.connecting-overlay',
+    '.reconnect-banner', '.conn-status',
+    'button', 'input', 'a', 'select'
+  ];
+
+  function isUIElement(el) {
+    return UI_SELECTORS.some(sel => el.closest(sel));
+  }
+
+  // Touch — spawn at each finger
+  wrap.addEventListener('touchstart', (e) => {
+    Array.from(e.changedTouches).forEach(t => {
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (el && isUIElement(el)) return;
+      spawnHearts(t.clientX, t.clientY);
+    });
+  }, { passive: true });
+
+  // Mouse / desktop
+  wrap.addEventListener('click', (e) => {
+    if (isUIElement(e.target)) return;
+    spawnHearts(e.clientX, e.clientY);
+  });
+}
+
+function spawnHearts(x, y) {
+  const wrap = document.getElementById('videoWrap');
+  if (!wrap) return;
+
+  // Ripple at tap point
+  const ripple = document.createElement('div');
+  ripple.className = 'tap-ripple';
+  ripple.style.left = x + 'px';
+  ripple.style.top = y + 'px';
+  wrap.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+
+  // Spawn 2-3 hearts — TikTok style from tap point, drift up with side wobble
+  const count = 2 + (Math.random() < 0.35 ? 1 : 0);
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const heart = document.createElement('div');
+      heart.className = 'fly-heart';
+
+      // Random parameters for each heart
+      const emoji = HEARTS[Math.floor(Math.random() * HEARTS.length)];
+      const size = 24 + Math.random() * 20; // 24–44px
+      const dur = 1.2 + Math.random() * 0.6; // 1.2–1.8s
+      const rot = (Math.random() - 0.5) * 30; // start tilt
+      const rot2 = rot + (Math.random() - 0.5) * 20;
+      const rot3 = rot2 + (Math.random() - 0.5) * 15;
+      const rot4 = rot3 + (Math.random() - 0.5) * 10;
+      // Lateral drift — TikTok hearts wobble left/right as they rise
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const dx1 = dir * (5 + Math.random() * 15) + 'px';
+      const dx2 = dir * (10 + Math.random() * 20) + 'px';
+      const dx3 = dir * (5 + Math.random() * 25) + 'px';
+      const dx4 = -dir * (0 + Math.random() * 10) + 'px'; // slight reversal at top
+      // Offset start position slightly
+      const startX = x + (Math.random() - 0.5) * 24;
+
+      heart.textContent = emoji;
+      heart.style.cssText = `
+        left:${startX}px;
+        top:${y - 10}px;
+        font-size:${size}px;
+        --dur:${dur}s;
+        --rot:${rot}deg;
+        --rot2:${rot2}deg;
+        --rot3:${rot3}deg;
+        --rot4:${rot4}deg;
+        --dx1:${dx1};
+        --dx2:${dx2};
+        --dx3:${dx3};
+        --dx4:${dx4};
+      `;
+      wrap.appendChild(heart);
+      setTimeout(() => heart.remove(), (dur + 0.1) * 1000);
+    }, i * 80);
+  }
+
+  // Update counter
+  loveTotal++;
+  showLoveCount();
+
+  // Batch broadcast every 300ms
+  loveBroadcastBuffer++;
+  clearTimeout(loveBroadcastTimer);
+  loveBroadcastTimer = setTimeout(() => {
+    if (chatChannel && currentProfile) {
+      chatChannel.send({
+        type: 'broadcast', event: 'love-tap',
+        payload: { username: currentProfile.username, count: loveBroadcastBuffer }
+      });
+    }
+    loveBroadcastBuffer = 0;
+  }, 300);
+}
+
+function showLoveCount() {
+  const el = document.getElementById('loveCount');
+  if (!el) return;
+  el.textContent = '❤️ ' + loveTotal;
+  el.classList.add('show');
+  clearTimeout(loveCountTimer);
+  loveCountTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

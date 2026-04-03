@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Watch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#000;--surface:#111;--border:#222;--accent:#ff2d55;--accent2:#ff6b35;--text:#fff;--muted:#888}
+    html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--text);overflow:hidden}
+
+    .video-wrap{height:100vh;position:relative}
+    video{width:100%;height:100%;object-fit:cover;cursor:pointer}
+    .overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.5) 0%,transparent 30%,transparent 50%,rgba(0,0,0,0.85) 100%);pointer-events:none}
+
+    .top-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:16px;z-index:10}
+    .back-btn{background:rgba(0,0,0,0.45);border:none;border-radius:50%;width:38px;height:38px;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+    .video-info{position:absolute;bottom:calc(80px + env(safe-area-inset-bottom,16px));left:16px;right:76px;z-index:10}
+    .user-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;text-decoration:none}
+    .user-row img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)}
+    .user-name{font-size:15px;font-weight:700;color:white}
+    .follow-inline{font-size:11px;background:var(--accent);border:none;border-radius:5px;color:white;padding:3px 9px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;font-weight:600}
+    .follow-inline.following{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3)}
+    .video-title{font-size:15px;font-weight:700;margin-bottom:4px}
+    .video-desc{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.5}
+    .video-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .tag{font-size:12px;color:rgba(255,255,255,0.7);cursor:pointer}
+
+    .action-sidebar{position:absolute;bottom:calc(80px + env(safe-area-inset-bottom,16px));right:10px;display:flex;flex-direction:column;align-items:center;gap:18px;z-index:10}
+    .action-btn{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;background:none;border:none;color:white}
+    .action-icon{width:48px;height:48px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;transition:transform 0.15s,background 0.2s}
+    .action-btn.liked .action-icon{background:rgba(255,45,85,0.3)}
+    .action-count{font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.5)}
+
+    /* ── COMMENT DRAWER ──────────────────── */
+    .drawer-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.65);display:none}
+    .drawer-overlay.open{display:block}
+    .comment-drawer{position:fixed;bottom:0;left:0;right:0;z-index:201;background:#111;border-radius:20px 20px 0 0;max-height:80vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1)}
+    .comment-drawer.open{transform:translateY(0)}
+    .drawer-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:10px auto 0}
+    .drawer-header{padding:12px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .drawer-title{font-size:16px;font-weight:700}
+    .drawer-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+    .comments-list{flex:1;overflow-y:auto;padding:0}
+    .comments-list::-webkit-scrollbar{display:none}
+
+    /* ── COMMENT ITEM ─────────────────────── */
+    .comment-item{display:flex;gap:10px;padding:12px 16px 0;animation:cmtIn 0.25s ease}
+    @keyframes cmtIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .comment-item.reply{padding-left:52px;padding-top:8px}
+    .comment-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;cursor:pointer}
+    .comment-avatar.sm{width:26px;height:26px}
+    .comment-body{flex:1;min-width:0;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .comment-item:last-child .comment-body{border-bottom:none}
+
+    .comment-username{font-size:13px;font-weight:700;margin-bottom:3px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+    .comment-badge{background:rgba(255,45,85,0.15);color:var(--accent);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px}
+    .comment-mention{color:var(--accent);font-weight:600}
+    .comment-text{font-size:14px;color:rgba(255,255,255,0.88);line-height:1.45;word-break:break-word}
+
+    .comment-meta{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}
+    .comment-time{font-size:11px;color:var(--muted)}
+    .comment-action-btn{font-size:12px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;font-weight:600;padding:0;display:flex;align-items:center;gap:3px;transition:color 0.15s}
+    .comment-action-btn:hover{color:white}
+    .comment-action-btn.liked{color:var(--accent)}
+    .comment-action-btn.liked .like-icon{animation:heartPop 0.25s ease}
+    @keyframes heartPop{0%{transform:scale(1)}50%{transform:scale(1.4)}100%{transform:scale(1)}}
+
+    /* ── REPLIES SECTION ─────────────────── */
+    .replies-section{padding:0 16px 0 52px}
+    .view-replies-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 0 10px;font-family:'DM Sans',sans-serif}
+    .view-replies-btn .line{width:24px;height:1.5px;background:var(--accent);opacity:0.5}
+    .replies-list{margin-bottom:4px}
+
+    /* ── INPUT ROW ───────────────────────── */
+    .comment-input-wrap{padding:10px 14px;border-top:1px solid var(--border);padding-bottom:max(10px,env(safe-area-inset-bottom));background:#111}
+    .reply-banner{display:none;background:rgba(255,45,85,0.08);border:1px solid rgba(255,45,85,0.2);border-radius:8px;padding:6px 12px;margin-bottom:8px;font-size:12px;color:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:space-between}
+    .reply-banner.show{display:flex}
+    .cancel-reply-btn{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 4px}
+    .comment-input-row{display:flex;gap:8px;align-items:center}
+    .comment-input-row img{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+    .comment-input{flex:1;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:24px;padding:9px 15px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s}
+    .comment-input::placeholder{color:var(--muted)}
+    .comment-input:focus{border-color:var(--accent)}
+    .send-btn{width:36px;height:36px;background:var(--accent);border:none;border-radius:50%;color:white;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s}
+    .send-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* ── EMPTY / SORT ────────────────────── */
+    .comment-sort-row{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px;border-bottom:1px solid rgba(255,255,255,0.05)}
+    .comment-sort-lbl{font-size:12px;color:var(--muted)}
+    .sort-select{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none}
+    .sort-select option{background:#111}
+    .empty-comments{text-align:center;padding:40px 20px;color:var(--muted)}
+    .empty-comments .emoji{font-size:36px;margin-bottom:10px}
+
+    /* ── LOADING / TOAST / PLAY ──────────── */
+    .loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:50;background:var(--bg)}
+    .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.96);border:1px solid #333;border-radius:10px;padding:10px 18px;font-size:13px;color:white;z-index:500;display:none;white-space:nowrap;pointer-events:none}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .play-ind{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:64px;opacity:0;pointer-events:none;transition:opacity 0.2s}
+    .play-ind.show{opacity:1;animation:indFade 0.7s ease forwards 0.1s}
+    @keyframes indFade{to{opacity:0;transform:translate(-50%,-50%) scale(1.3)}}
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="video-wrap">
+  <div class="loader" id="loader"><div class="spinner"></div></div>
+  <video id="mainVideo" loop playsinline onclick="togglePlay()" autoplay></video>
+  <div class="overlay"></div>
+  <div class="play-ind" id="playInd">▶</div>
+
+  <div class="top-bar">
+    <button class="back-btn" onclick="history.back()">←</button>
+  </div>
+
+  <div class="video-info" id="videoInfo"></div>
+  <div class="action-sidebar" id="actionSidebar"></div>
+</div>
+
+<!-- COMMENT DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeComments()"></div>
+<div class="comment-drawer" id="commentDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <span class="drawer-title">💬 <span id="commentCount">0</span> komen</span>
+    <button class="drawer-close" onclick="closeComments()">✕</button>
+  </div>
+
+  <div class="comment-sort-row">
+    <span class="comment-sort-lbl">Susun ikut</span>
+    <select class="sort-select" id="sortSelect" onchange="loadComments(videoData?.id)">
+      <option value="newest">Terbaru</option>
+      <option value="popular">Popular</option>
+      <option value="oldest">Terlama</option>
+    </select>
+  </div>
+
+  <div class="comments-list" id="commentsList">
+    <div class="spinner" style="margin:30px auto;width:30px;height:30px;border-width:3px"></div>
+  </div>
+
+  <div class="comment-input-wrap">
+    <div class="reply-banner" id="replyBanner">
+      <span id="replyBannerText">Membalas @...</span>
+      <button class="cancel-reply-btn" onclick="cancelReply()">✕</button>
+    </div>
+    <div class="comment-input-row">
+      <img id="myAvatar" src="https://ui-avatars.com/api/?name=U&background=random&color=fff" alt="me"/>
+      <input class="comment-input" id="commentInput" placeholder="Tulis komen..." maxlength="300"/>
+      <button class="send-btn" id="sendCommentBtn" onclick="postComment()">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let videoData = null;
+let currentUser = null;
+let currentProfile = null;
+let isLiked = false;
+let isFollowing = false;
+let isBookmarked = false;
+let isPostingComment = false;
+
+function showToast(msg, ms=2000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (currentUser) currentProfile = await getCurrentProfile();
+
+  const params = new URLSearchParams(window.location.search);
+  const videoId = params.get('id');
+  if (!videoId) return history.back();
+
+  const { data } = await sb.from('videos')
+    .select('*, profiles(id, username, display_name, avatar_url, followers_count)')
+    .eq('id', videoId).single();
+
+  if (!data) { history.back(); return; }
+  videoData = data;
+  document.title = `VIBES — @${data.profiles?.username}`;
+
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('mainVideo').src = data.video_url;
+
+  // Set my avatar in comment input
+  if (currentProfile) {
+    document.getElementById('myAvatar').src = getAvatarUrl(currentProfile);
+  }
+
+  // Check liked + followed
+  if (currentUser) {
+    const [{ data: like }, { data: follow }, { data: bookmark }] = await Promise.all([
+      sb.from('likes').select('id').eq('user_id', currentUser.id).eq('video_id', videoId).maybeSingle(),
+      sb.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', data.profiles?.id).maybeSingle(),
+      sb.from('bookmarks').select('id').eq('user_id', currentUser.id).eq('video_id', videoId).maybeSingle()
+    ]);
+    isLiked = !!like;
+    isFollowing = !!follow;
+    isBookmarked = !!bookmark;
+  }
+
+  renderInfo(data);
+  renderActions(data);
+
+  // Count view (non-blocking)
+  sb.from('videos').update({ views_count: (data.views_count || 0) + 1 }).eq('id', videoId);
+}
+
+function renderInfo(v) {
+  const p = v.profiles;
+  const desc = v.description || v.title || '';
+  const tags = desc.match(/#\w+/g) || [];
+  const clean = desc.replace(/#\w+/g, '').trim();
+  const showFollow = currentUser && currentUser.id !== p?.id;
+
+  document.getElementById('videoInfo').innerHTML = `
+    <a class="user-row" href="profile.html?id=${p?.id}">
+      <img src="${getAvatarUrl(p)}" alt="${p?.display_name}" />
+      <span class="user-name">@${p?.username}</span>
+      ${showFollow ? `<button class="follow-inline ${isFollowing ? 'following' : ''}" id="followInlineBtn" onclick="toggleFollow(event)">${isFollowing ? '✓ Following' : '+ Follow'}</button>` : ''}
+    </a>
+    ${v.title ? `<div class="video-title">${v.title}</div>` : ''}
+    ${clean ? `<div class="video-desc">${clean.substring(0, 120)}</div>` : ''}
+    ${tags.length ? `<div class="video-tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+  `;
+}
+
+function renderActions(v) {
+  document.getElementById('actionSidebar').innerHTML = `
+    <button class="action-btn ${isLiked ? 'liked' : ''}" id="likeBtn" onclick="toggleLike('${v.id}')">
+      <div class="action-icon" id="likeIcon">${isLiked ? '❤️' : '🤍'}</div>
+      <span class="action-count" id="likeCount">${formatCount(v.likes_count)}</span>
+    </button>
+    <button class="action-btn" onclick="openComments('${v.id}', ${v.comments_count})">
+      <div class="action-icon">💬</div>
+      <span class="action-count" id="commentCountSide">${formatCount(v.comments_count)}</span>
+    </button>
+    <button class="action-btn" id="bookmarkBtn" onclick="toggleBookmark('${v.id}')">
+      <div class="action-icon" id="bookmarkIcon">${isBookmarked ? '🔖' : '📌'}</div>
+      <span class="action-count">Save</span>
+    </button>
+    <button class="action-btn" onclick="shareVideo('${v.id}')">
+      <div class="action-icon">↗️</div>
+      <span class="action-count">Share</span>
+    </button>
+    <button class="action-btn" onclick="openReport('${v.id}')">
+      <div class="action-icon">🚩</div>
+      <span class="action-count">Report</span>
+    </button>
+  `;
+}
+
+function togglePlay() {
+  const vid = document.getElementById('mainVideo');
+  const ind = document.getElementById('playInd');
+  ind.textContent = vid.paused ? '▶' : '⏸';
+  ind.classList.remove('show'); void ind.offsetWidth; ind.classList.add('show');
+  vid.paused ? vid.play() : vid.pause();
+}
+
+// ── LIKE ────────────────────────────────────
+async function toggleLike(videoId) {
+  if (!currentUser) { showToast('Log in untuk like!'); return window.location.href = 'auth.html'; }
+  const btn = document.getElementById('likeBtn');
+  isLiked = !isLiked;
+  btn.classList.toggle('liked', isLiked);
+  document.getElementById('likeIcon').textContent = isLiked ? '❤️' : '🤍';
+
+  if (isLiked) await sb.from('likes').insert({ user_id: currentUser.id, video_id: videoId });
+  else await sb.from('likes').delete().eq('user_id', currentUser.id).eq('video_id', videoId);
+
+  const { data } = await sb.from('videos').select('likes_count').eq('id', videoId).single();
+  if (data) document.getElementById('likeCount').textContent = formatCount(data.likes_count);
+}
+
+// ── FOLLOW ──────────────────────────────────
+async function toggleFollow(event) {
+  event.preventDefault(); event.stopPropagation();
+  if (!currentUser) return window.location.href = 'auth.html';
+  const btn = document.getElementById('followInlineBtn');
+  if (!btn) return;
+
+  if (isFollowing) {
+    await sb.from('follows').delete().eq('follower_id', currentUser.id).eq('following_id', videoData.profiles?.id);
+    isFollowing = false;
+    btn.textContent = '+ Follow';
+    btn.className = 'follow-inline';
+  } else {
+    await sb.from('follows').insert({ follower_id: currentUser.id, following_id: videoData.profiles?.id });
+    isFollowing = true;
+    btn.textContent = '✓ Following';
+    btn.className = 'follow-inline following';
+    showToast('✅ Following @' + videoData.profiles?.username);
+  }
+}
+
+// ── COMMENTS ────────────────────────────────
+async function openComments(videoId, count) {
+  document.getElementById('commentCount').textContent = count;
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('commentDrawer').classList.add('open');
+  await loadComments(videoId);
+}
+
+function closeComments() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('commentDrawer').classList.remove('open');
+  cancelReply();
+}
+
+// ── LOAD COMMENTS (top-level only, replies loaded on demand) ──
+async function loadComments(videoId) {
+  if (!videoId) return;
+  const list = document.getElementById('commentsList');
+  list.innerHTML = '<div class="spinner" style="margin:30px auto;width:30px;height:30px;border-width:3px"></div>';
+
+  const sort = document.getElementById('sortSelect')?.value || 'newest';
+  const orderCol = sort === 'popular' ? 'likes_count' : 'created_at';
+  const asc = sort === 'oldest';
+
+  // Load top-level comments only (parent_id IS NULL)
+  const { data: comments } = await sb.from('comments')
+    .select('*, profiles(id, username, display_name, avatar_url)')
+    .eq('video_id', videoId)
+    .is('parent_id', null)
+    .order(orderCol, { ascending: asc })
+    .limit(50);
+
+  if (!comments || comments.length === 0) {
+    list.innerHTML = `<div class="empty-comments"><div class="emoji">💬</div><p>Tiada komen lagi.<br>Jadi yang pertama!</p></div>`;
+    return;
+  }
+
+  // Get liked comment IDs for current user
+  let likedIds = new Set();
+  if (currentUser && comments.length > 0) {
+    const { data: liked } = await sb.from('comment_likes')
+      .select('comment_id')
+      .eq('user_id', currentUser.id)
+      .in('comment_id', comments.map(c => c.id));
+    if (liked) liked.forEach(l => likedIds.add(l.comment_id));
+  }
+
+  list.innerHTML = comments.map(c => renderComment(c, likedIds, false)).join('');
+}
+
+// ── RENDER SINGLE COMMENT ────────────────────
+function renderComment(c, likedIds = new Set(), isReply = false) {
+  const isOwner = currentUser && currentUser.id === c.user_id;
+  const isLiked = likedIds.has(c.id);
+  const isVideoOwner = currentUser && videoData && currentUser.id === videoData.user_id;
+
+  return `
+    <div class="comment-item ${isReply ? 'reply' : ''}" id="cmt_${c.id}">
+      <img class="comment-avatar ${isReply ? 'sm' : ''}"
+        src="${getAvatarUrl(c.profiles)}" alt="${c.profiles?.username}"
+        onclick="window.location.href='profile.html?id=${c.profiles?.id}'" />
+      <div class="comment-body">
+        <div class="comment-username" onclick="window.location.href='profile.html?id=${c.profiles?.id}'">
+          @${c.profiles?.username}
+          ${isVideoOwner && !isReply ? `<span class="comment-badge">Creator</span>` : ''}
+        </div>
+        <div class="comment-text" id="cmtText_${c.id}">${renderCommentText(c.content)}</div>
+        <div class="comment-meta">
+          <span class="comment-time">${timeAgo(c.created_at)}</span>
+          <button class="comment-action-btn ${isLiked ? 'liked' : ''}" id="likeBtn_${c.id}"
+            onclick="toggleCommentLike('${c.id}', ${isLiked})">
+            <span class="like-icon">${isLiked ? '❤️' : '🤍'}</span>
+            <span id="likeCnt_${c.id}">${c.likes_count > 0 ? c.likes_count : ''}</span>
+          </button>
+          ${!isReply ? `<button class="comment-action-btn" onclick="startReply('${c.id}','${c.profiles?.username}')">
+            💬 Balas
+          </button>` : ''}
+          ${isOwner ? `<button class="comment-action-btn" onclick="deleteComment('${c.id}')">
+            🗑️
+          </button>` : ''}
+        </div>
+      </div>
+    </div>
+    ${!isReply && c.replies_count > 0 ? `
+      <div class="replies-section" id="replies_${c.id}">
+        <button class="view-replies-btn" id="repliesBtn_${c.id}" onclick="toggleReplies('${c.id}', '${c.video_id}')">
+          <div class="line"></div>
+          <span>Lihat ${c.replies_count} balasan</span>
+        </button>
+        <div class="replies-list" id="repliesList_${c.id}" style="display:none"></div>
+      </div>` : ''}`;
+}
+
+// ── RENDER TEXT — highlight @mentions and #tags ──
+function renderCommentText(text) {
+  return escapeHtml(text)
+    .replace(/@(\w+)/g, '<span class="comment-mention">@$1</span>')
+    .replace(/#(\w+)/g, '<span style="color:#60a5fa">#$1</span>');
+}
+
+// ── TOGGLE REPLIES ───────────────────────────
+async function toggleReplies(commentId, videoId) {
+  const list = document.getElementById(`repliesList_${commentId}`);
+  const btn = document.getElementById(`repliesBtn_${commentId}`);
+  const isOpen = list.style.display !== 'none';
+
+  if (isOpen) {
+    list.style.display = 'none';
+    // Update button text
+    const { data: c } = await sb.from('comments').select('replies_count').eq('id', commentId).maybeSingle();
+    if (btn) btn.innerHTML = `<div class="line"></div><span>Lihat ${c?.replies_count || 0} balasan</span>`;
+    return;
+  }
+
+  // Load replies
+  btn.innerHTML = `<div class="line"></div><span>Loading...</span>`;
+  const { data: replies } = await sb.from('comments')
+    .select('*, profiles(id, username, display_name, avatar_url)')
+    .eq('parent_id', commentId)
+    .order('created_at', { ascending: true })
+    .limit(20);
+
+  // Get liked IDs for replies
+  let likedIds = new Set();
+  if (currentUser && replies?.length > 0) {
+    const { data: liked } = await sb.from('comment_likes')
+      .select('comment_id').eq('user_id', currentUser.id)
+      .in('comment_id', replies.map(r => r.id));
+    if (liked) liked.forEach(l => likedIds.add(l.comment_id));
+  }
+
+  list.innerHTML = (replies || []).map(r => renderComment(r, likedIds, true)).join('');
+  list.style.display = 'block';
+  if (btn) btn.innerHTML = `<div class="line"></div><span>Sembunyikan balasan</span>`;
+}
+
+// ── REPLY STATE ──────────────────────────────
+let replyingTo = null; // { commentId, username }
+
+function startReply(commentId, username) {
+  replyingTo = { commentId, username };
+  const banner = document.getElementById('replyBanner');
+  banner.classList.add('show');
+  document.getElementById('replyBannerText').textContent = `Membalas @${username}`;
+  const input = document.getElementById('commentInput');
+  input.placeholder = `@${username} ...`;
+  input.focus();
+  // Scroll input into view
+  input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelReply() {
+  replyingTo = null;
+  const banner = document.getElementById('replyBanner');
+  banner.classList.remove('show');
+  const input = document.getElementById('commentInput');
+  if (input) { input.placeholder = 'Tulis komen...'; input.value = ''; }
+}
+
+// ── POST COMMENT / REPLY ─────────────────────
+async function postComment() {
+  if (!currentUser) { closeComments(); return window.location.href = 'auth.html'; }
+  const input = document.getElementById('commentInput');
+  let text = input.value.trim();
+  if (!text || isPostingComment) return;
+
+  // Prepend @mention if replying
+  if (replyingTo && !text.startsWith('@')) {
+    text = `@${replyingTo.username} ${text}`;
+  }
+
+  isPostingComment = true;
+  const btn = document.getElementById('sendCommentBtn');
+  if (btn) btn.disabled = true;
+
+  const payload = {
+    user_id: currentUser.id,
+    video_id: videoData.id,
+    content: text,
+    parent_id: replyingTo?.commentId || null
+  };
+
+  const { error } = await sb.from('comments').insert(payload);
+  if (error) { showToast('Gagal hantar komen'); isPostingComment = false; if (btn) btn.disabled = false; return; }
+
+  input.value = '';
+  const wasReply = !!replyingTo;
+  const parentId = replyingTo?.commentId;
+  cancelReply();
+
+  if (wasReply && parentId) {
+    // Refresh replies inline
+    const { data: c } = await sb.from('comments').select('replies_count').eq('id', parentId).maybeSingle();
+    const btn2 = document.getElementById(`repliesBtn_${parentId}`);
+    if (btn2) btn2.innerHTML = `<div class="line"></div><span>Lihat ${c?.replies_count || 0} balasan</span>`;
+    // Auto-open replies if list is visible
+    const list = document.getElementById(`repliesList_${parentId}`);
+    if (list && list.style.display !== 'none') {
+      await toggleReplies(parentId, videoData.id);
+      await toggleReplies(parentId, videoData.id); // re-open
+    }
+  } else {
+    await loadComments(videoData.id);
+  }
+
+  // Update counts
+  const { data: v } = await sb.from('videos').select('comments_count').eq('id', videoData.id).single();
+  if (v) {
+    document.getElementById('commentCount').textContent = v.comments_count;
+    const side = document.getElementById('commentCountSide');
+    if (side) side.textContent = formatCount(v.comments_count);
+  }
+
+  isPostingComment = false;
+  if (btn) btn.disabled = false;
+}
+
+// ── LIKE / UNLIKE COMMENT ────────────────────
+async function toggleCommentLike(commentId, currentlyLiked) {
+  if (!currentUser) return window.location.href = 'auth.html';
+
+  const btn = document.getElementById(`likeBtn_${commentId}`);
+  const cntEl = document.getElementById(`likeCnt_${commentId}`);
+  const icon = btn?.querySelector('.like-icon');
+
+  // Optimistic update
+  const nowLiked = !currentlyLiked;
+  if (btn) btn.classList.toggle('liked', nowLiked);
+  if (icon) icon.textContent = nowLiked ? '❤️' : '🤍';
+  btn?.setAttribute('onclick', `toggleCommentLike('${commentId}', ${nowLiked})`);
+
+  if (currentlyLiked) {
+    await sb.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
+  } else {
+    await sb.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
+  }
+
+  // Refresh count
+  const { data } = await sb.from('comments').select('likes_count').eq('id', commentId).maybeSingle();
+  if (cntEl && data) cntEl.textContent = data.likes_count > 0 ? data.likes_count : '';
+}
+
+// ── DELETE COMMENT ───────────────────────────
+async function deleteComment(commentId) {
+  if (!confirm('Padam komen ini?')) return;
+  await sb.from('comments').delete().eq('id', commentId);
+  // Remove from DOM immediately
+  const el = document.getElementById(`cmt_${commentId}`);
+  if (el) el.remove();
+  const replySection = document.getElementById(`replies_${commentId}`);
+  if (replySection) replySection.remove();
+  // Update count
+  const { data } = await sb.from('videos').select('comments_count').eq('id', videoData.id).single();
+  if (data) {
+    document.getElementById('commentCount').textContent = data.comments_count;
+    const side = document.getElementById('commentCountSide');
+    if (side) side.textContent = formatCount(data.comments_count);
+  }
+}
+
+// ── SHARE ────────────────────────────────────
+async function shareVideo(videoId) {
+  const url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: `VIBES — @${videoData.profiles?.username}`, url });
+  } else {
+    await navigator.clipboard.writeText(url);
+    showToast('🔗 Link disalin!');
+  }
+}
+
+// ── BOOKMARK ─────────────────────────────────
+async function toggleBookmark(videoId) {
+  if (!currentUser) { showToast('Log in untuk save!'); return window.location.href = 'auth.html'; }
+  isBookmarked = !isBookmarked;
+  const icon = document.getElementById('bookmarkIcon');
+  if (icon) icon.textContent = isBookmarked ? '🔖' : '📌';
+  if (isBookmarked) {
+    await sb.from('bookmarks').insert({ user_id: currentUser.id, video_id: videoId });
+    showToast('🔖 Video disimpan!');
+  } else {
+    await sb.from('bookmarks').delete().eq('user_id', currentUser.id).eq('video_id', videoId);
+    showToast('📌 Removed dari saved');
+  }
+}
+
+// ── REPORT ───────────────────────────────────
+const REPORT_REASONS = [
+  { value: 'spam', label: '🚫 Spam' },
+  { value: 'nudity', label: '🔞 Kandungan lucah' },
+  { value: 'violence', label: '⚔️ Keganasan' },
+  { value: 'hate_speech', label: '😡 Ucapan kebencian' },
+  { value: 'harassment', label: '😤 Gangguan/buli' },
+  { value: 'misinformation', label: '❌ Maklumat palsu' },
+  { value: 'copyright', label: '©️ Hak cipta' },
+  { value: 'other', label: '❓ Lain-lain' },
+];
+
+function openReport(videoId) {
+  if (!currentUser) return window.location.href = 'auth.html';
+  // Create report modal
+  const existing = document.getElementById('reportModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'reportModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.8);display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="background:#111;border-radius:20px 20px 0 0;padding:20px 16px 40px;width:100%;border-top:1px solid #222">
+      <div style="width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:14px">🚩 Report Video</div>
+      ${REPORT_REASONS.map(r => `
+        <div onclick="submitReport('${videoId}','${r.value}')" style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;font-size:14px;transition:color 0.15s" onmouseover="this.style.color='#ff2d55'" onmouseout="this.style.color=''">
+          ${r.label}
+        </div>`).join('')}
+      <button onclick="document.getElementById('reportModal').remove()" style="width:100%;margin-top:14px;padding:12px;background:rgba(255,255,255,0.08);border:none;border-radius:12px;color:#888;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">Batal</button>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function submitReport(videoId, reason) {
+  document.getElementById('reportModal')?.remove();
+  const { error } = await sb.from('reports').insert({
+    reporter_id: currentUser.id,
+    reported_video_id: videoId,
+    reason
+  });
+  if (error && !error.message.includes('duplicate')) {
+    showToast('Gagal report: ' + error.message); return;
+  }
+  showToast('✅ Report dihantar. Terima kasih!');
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('commentInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(); }
+});
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

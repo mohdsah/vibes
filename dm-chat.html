@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555}
+    html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--text)}
+
+    /* Header */
+    .chat-header{display:flex;align-items:center;gap:12px;padding:14px 16px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;flex-shrink:0}
+    .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;cursor:pointer}
+    .header-info{flex:1;cursor:pointer}
+    .header-name{font-size:15px;font-weight:700}
+    .header-status{font-size:12px;color:var(--muted)}
+    .header-actions{display:flex;gap:10px}
+    .header-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+
+    /* Messages area */
+    .messages-area{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:calc(100vh - 130px);overflow-y:auto}
+
+    .msg-group{display:flex;flex-direction:column;gap:3px}
+    .msg-group.mine{align-items:flex-end}
+    .msg-group.theirs{align-items:flex-start}
+
+    .msg-bubble{max-width:75%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.4;word-break:break-word;position:relative}
+    .msg-group.mine .msg-bubble{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border-bottom-right-radius:4px}
+    .msg-group.theirs .msg-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px}
+
+    .msg-time{font-size:10px;color:var(--muted);padding:0 4px;margin-top:2px}
+    .msg-read{font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px}
+
+    /* Date divider */
+    .date-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;margin:10px 0}
+    .date-divider::before,.date-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* Sender row */
+    .sender-row{display:flex;align-items:flex-end;gap:8px}
+    .sender-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;cursor:pointer}
+
+    /* Input area */
+    .input-area{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:flex;align-items:flex-end;gap:8px}
+    .msg-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:10px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;resize:none;max-height:120px;line-height:1.4}
+    .msg-input:focus{border-color:var(--accent)}
+    .msg-input::placeholder{color:var(--muted)}
+    .send-btn{width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;color:white;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s}
+    .send-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* Loading */
+    .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Empty */
+    .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);text-align:center;padding:40px}
+    .chat-empty .emoji{font-size:48px}
+  </style>
+</head>
+<body>
+
+<div class="chat-header">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goToProfile()" />
+  <div class="header-info" onclick="goToProfile()">
+    <div class="header-name" id="headerName">Loading...</div>
+    <div class="header-status" id="headerStatus">...</div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="goToProfile()">👤</button>
+  </div>
+</div>
+
+<div class="messages-area" id="messagesArea">
+  <div class="spinner"></div>
+</div>
+
+<div class="input-area">
+  <textarea class="msg-input" id="msgInput" placeholder="Tulis mesej..." rows="1" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+</div>
+
+<script>
+let currentUser = null, currentProfile = null;
+let convId = null, otherUserId = null, otherProfile = null;
+let messages = [];
+let isSending = false;
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  currentProfile = await getCurrentProfile();
+
+  const params = new URLSearchParams(window.location.search);
+  convId = params.get('conv');
+  otherUserId = params.get('user');
+
+  if (!convId || !otherUserId) return window.location.href = 'dm.html';
+
+  // Load other user profile
+  const { data: other } = await sb.from('profiles').select('*').eq('id', otherUserId).single();
+  if (!other) return window.location.href = 'dm.html';
+  otherProfile = other;
+
+  document.getElementById('headerAvatar').src = getAvatarUrl(other);
+  document.getElementById('headerName').textContent = other.display_name || other.username;
+  document.getElementById('headerStatus').textContent = '@' + other.username;
+  document.title = `VIBES — ${other.display_name || other.username}`;
+
+  await loadMessages();
+  markAsRead();
+  subscribeMessages();
+}
+
+async function loadMessages() {
+  const { data } = await sb.from('dm_messages')
+    .select('*')
+    .eq('conversation_id', convId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  messages = data || [];
+  renderMessages();
+  scrollToBottom();
+}
+
+function renderMessages() {
+  const area = document.getElementById('messagesArea');
+  if (!messages.length) {
+    area.innerHTML = `<div class="chat-empty"><div class="emoji">👋</div><p>Mula perbualan dengan<br><strong>@${otherProfile?.username}</strong></p></div>`;
+    return;
+  }
+
+  let html = '';
+  let lastDate = '';
+
+  messages.forEach((msg, i) => {
+    const isMe = msg.sender_id === currentUser.id;
+    const date = new Date(msg.created_at).toDateString();
+    const prevMsg = messages[i - 1];
+    const sameGroup = prevMsg && prevMsg.sender_id === msg.sender_id && (new Date(msg.created_at) - new Date(prevMsg.created_at)) < 120000;
+
+    if (date !== lastDate) {
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      html += `<div class="date-divider">${date === today ? 'Hari Ini' : date === yesterday ? 'Semalam' : new Date(msg.created_at).toLocaleDateString('ms-MY')}</div>`;
+      lastDate = date;
+    }
+
+    if (isMe) {
+      html += `
+        <div class="msg-group mine">
+          <div class="msg-bubble">${escapeHtml(msg.content)}</div>
+          ${!sameGroup || i === messages.length - 1 ? `<div class="msg-time">${formatTime(msg.created_at)}${msg.is_read ? ' ✓✓' : ' ✓'}</div>` : ''}
+        </div>`;
+    } else {
+      html += `
+        <div class="sender-row">
+          ${!sameGroup ? `<img class="sender-avatar" src="${getAvatarUrl(otherProfile)}" onclick="goToProfile()" />` : '<div style="width:28px;flex-shrink:0"></div>'}
+          <div class="msg-group theirs">
+            <div class="msg-bubble">${escapeHtml(msg.content)}</div>
+            ${!sameGroup || i === messages.length - 1 ? `<div class="msg-time">${formatTime(msg.created_at)}</div>` : ''}
+          </div>
+        </div>`;
+    }
+  });
+
+  area.innerHTML = html;
+}
+
+function formatTime(dateStr) {
+  return new Date(dateStr).toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
+}
+
+function scrollToBottom(smooth = false) {
+  const area = document.getElementById('messagesArea');
+  area.scrollTo({ top: area.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text || isSending) return;
+  isSending = true;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  const { error } = await sb.from('dm_messages').insert({
+    conversation_id: convId,
+    sender_id: currentUser.id,
+    content: text
+  });
+
+  if (error) { alert('Gagal hantar: ' + error.message); isSending = false; return; }
+
+  await loadMessages();
+  scrollToBottom(true);
+  isSending = false;
+}
+
+async function markAsRead() {
+  // Mark messages as read
+  await sb.from('dm_messages').update({ is_read: true })
+    .eq('conversation_id', convId)
+    .neq('sender_id', currentUser.id)
+    .eq('is_read', false);
+
+  // Reset unread count
+  const isUser1 = (await sb.from('dm_conversations').select('user1_id').eq('id', convId).single()).data?.user1_id === currentUser.id;
+  if (isUser1) await sb.from('dm_conversations').update({ user1_unread: 0 }).eq('id', convId);
+  else await sb.from('dm_conversations').update({ user2_unread: 0 }).eq('id', convId);
+}
+
+function subscribeMessages() {
+  sb.channel(`chat-${convId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages',
+      filter: `conversation_id=eq.${convId}` }, async ({ new: msg }) => {
+      messages.push(msg);
+      renderMessages();
+      scrollToBottom(true);
+      if (msg.sender_id !== currentUser.id) markAsRead();
+    })
+    .subscribe();
+}
+
+function goToProfile() { window.location.href = 'profile.html?id=' + otherUserId; }
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleEnter(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

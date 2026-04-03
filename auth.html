@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBES — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a; --surface: #111111; --border: #1e1e1e;
+      --accent: #ff2d55; --accent2: #ff6b35; --text: #f0f0f0; --muted: #666;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15; animation: float 8s ease-in-out infinite; }
+    .orb-1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: var(--accent2); bottom: -50px; right: -50px; animation-delay: 3s; }
+    .orb-3 { width: 200px; height: 200px; background: #a855f7; top: 50%; left: 50%; animation-delay: 6s; }
+    @keyframes float { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-30px) scale(1.05); } }
+
+    .auth-wrap { position: relative; z-index: 1; width: 100%; max-width: 420px; padding: 24px; }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 52px; letter-spacing: 4px; text-align: center; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .tagline { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 40px; letter-spacing: 2px; text-transform: uppercase; }
+    .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; }
+
+    /* TABS - explicit state, no event.target */
+    .tabs { display: flex; background: var(--bg); border-radius: 12px; padding: 4px; margin-bottom: 28px; gap: 4px; }
+    .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: var(--accent); color: white; }
+
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+
+    .btn-primary { width: 100%; padding: 15px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; color: white; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-msg { background: rgba(255,45,85,0.1); border: 1px solid rgba(255,45,85,0.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--accent); margin-bottom: 16px; display: none; }
+    .success-msg { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #22c55e; margin-bottom: 16px; display: none; }
+    .form-panel { display: none; }
+    .form-panel.active { display: block; }
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+<div class="bg-orbs">
+  <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+</div>
+
+<div class="auth-wrap">
+  <div class="logo">VIBES</div>
+  <p class="tagline">Share your world, one clip at a time</p>
+  <div class="auth-card">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabLoginBtn" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" id="tabRegisterBtn" onclick="switchTab('register')">Sign Up</button>
+    </div>
+    <div id="errorMsg" class="error-msg"></div>
+    <div id="successMsg" class="success-msg"></div>
+
+    <div id="loginPanel" class="form-panel active">
+      <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com" /></div>
+      <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" /></div>
+      <button class="btn-primary" id="loginBtn" onclick="handleLogin()">Sign In</button>
+    </div>
+
+    <div id="registerPanel" class="form-panel">
+      <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="yourhandle" /></div>
+      <div class="form-group"><label>Display Name</label><input type="text" id="regDisplayName" placeholder="Your Name" /></div>
+      <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com" /></div>
+      <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Min 6 characters" /></div>
+      <button class="btn-primary" id="registerBtn" onclick="handleRegister()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const user = await getCurrentUser();
+  if (user) window.location.href = 'index.html';
+})();
+
+// ✅ FIX: No event.target — use explicit IDs
+function switchTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('tabLoginBtn').classList.toggle('active', isLogin);
+  document.getElementById('tabRegisterBtn').classList.toggle('active', !isLogin);
+  document.getElementById('loginPanel').classList.toggle('active', isLogin);
+  document.getElementById('registerPanel').classList.toggle('active', !isLogin);
+  hideMessages();
+}
+
+function showError(msg) { const e = document.getElementById('errorMsg'); e.textContent = msg; e.style.display = 'block'; document.getElementById('successMsg').style.display = 'none'; }
+function showSuccess(msg) { const e = document.getElementById('successMsg'); e.textContent = msg; e.style.display = 'block'; document.getElementById('errorMsg').style.display = 'none'; }
+function hideMessages() { document.getElementById('errorMsg').style.display = 'none'; document.getElementById('successMsg').style.display = 'none'; }
+
+async function handleLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) return showError('Sila isi semua field.');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { showError(error.message); btn.disabled = false; btn.textContent = 'Sign In'; }
+  else { window.location.href = 'index.html'; }
+}
+
+async function handleRegister() {
+  const username = document.getElementById('regUsername').value.trim().toLowerCase();
+  const displayName = document.getElementById('regDisplayName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  if (!username || !displayName || !email || !password) return showError('Sila isi semua field.');
+  if (password.length < 6) return showError('Password mesti 6 aksara atau lebih.');
+  if (!/^[a-z0-9_]+$/.test(username)) return showError('Username: huruf kecil, nombor & _ sahaja.');
+
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+
+  const { data: existing } = await sb.from('profiles').select('id').eq('username', username).maybeSingle();
+  if (existing) { showError('Username sudah digunakan.'); btn.disabled = false; btn.textContent = 'Create Account'; return; }
+
+  btn.textContent = 'Creating account...';
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username, display_name: displayName } } });
+  if (error) { showError(error.message); }
+  else if (data?.session) { window.location.href = 'index.html'; }
+  else { showSuccess('Account dibuat! Semak email → verify → Sign In.'); }
+  btn.disabled = false; btn.textContent = 'Create Account';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('loginPanel').classList.contains('active')) handleLogin();
+  else handleRegister();
+});
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

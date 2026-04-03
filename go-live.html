@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Go Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--live:#ff3b30;--text:#f0f0f0;--muted:#666;--gold:#ffd700}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+    /* ── SETUP ─────────── */
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .page-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;background:linear-gradient(135deg,var(--live),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .container{padding:20px 20px 40px;max-width:480px;margin:0 auto}
+    .setup-preview{width:100%;aspect-ratio:9/16;max-height:300px;background:#000;border-radius:18px;overflow:hidden;border:2px solid var(--border);position:relative;margin-bottom:20px}
+    .setup-preview video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+    .preview-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted)}
+    .preview-off .icon{font-size:44px}
+    .section{margin-bottom:18px}
+    .section-label{font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+    .cam-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;padding:13px;cursor:pointer}
+    input[type="text"],input[type="number"]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color 0.2s}
+    input:focus{border-color:var(--accent)}
+    input::placeholder{color:var(--muted)}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+    .toggle-label{font-size:14px;font-weight:500}
+    .toggle-sub{font-size:12px;color:var(--muted)}
+    .toggle-switch{width:46px;height:26px;background:var(--border);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0}
+    .toggle-switch.on{background:var(--accent)}
+    .toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:transform 0.2s}
+    .toggle-switch.on::after{transform:translateX(20px)}
+    .target-fields{display:none;margin-top:12px;flex-direction:column;gap:10px}
+    .target-fields.show{display:flex}
+    .preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .preset-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:all 0.15s}
+    .preset-btn.active{border-color:var(--gold);background:rgba(255,215,0,0.08)}
+    .preset-coins{font-size:13px;font-weight:700;color:var(--gold)}
+    .preset-label{font-size:10px;color:var(--muted);margin-top:2px}
+    .golive-btn{width:100%;padding:16px;background:linear-gradient(135deg,var(--live),var(--accent));border:none;border-radius:14px;color:white;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:24px}
+    .golive-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* ── LIVE SCREEN ───── */
+    .live-screen{display:none;position:fixed;inset:0;background:#000}
+    #livePreview{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+    .live-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.55) 0%,transparent 22%,transparent 50%,rgba(0,0,0,0.9) 100%);pointer-events:none}
+
+    /* Top bar */
+    .live-top{position:absolute;top:0;left:0;right:0;padding:14px 14px 0;display:flex;align-items:center;gap:8px;z-index:10;flex-wrap:wrap}
+    .live-badge{background:var(--live);color:white;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;letter-spacing:1px;animation:livePulse 2s infinite}
+    @keyframes livePulse{0%,100%{opacity:1}50%{opacity:0.6}}
+    .viewer-badge{background:rgba(0,0,0,0.5);backdrop-filter:blur(10px);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600}
+    .coins-badge{background:rgba(255,215,0,0.2);border:1px solid rgba(255,215,0,0.3);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;color:var(--gold)}
+    .end-btn{margin-left:auto;background:rgba(255,59,48,0.35);border:1px solid var(--live);border-radius:8px;color:white;padding:7px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+
+    /* Target bar */
+    .live-target-bar{position:absolute;top:64px;left:14px;right:14px;z-index:10;background:rgba(0,0,0,0.65);backdrop-filter:blur(12px);border:1px solid rgba(255,215,0,0.25);border-radius:12px;padding:9px 12px;display:none}
+    .live-target-bar.show{display:block}
+    .ltb-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11px;font-weight:700}
+    .ltb-title{color:var(--gold)}
+    .ltb-amounts{color:rgba(255,255,255,0.65)}
+    .ltb-bg{height:6px;background:rgba(255,255,255,0.12);border-radius:10px;overflow:hidden}
+    .ltb-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9500);border-radius:10px;transition:width 0.4s}
+
+    /* Chat — FIX: overflow-y:auto so it's scrollable */
+    .live-chat-host{position:absolute;bottom:130px;left:0;right:76px;padding:0 12px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;z-index:10}
+    .live-chat-host::-webkit-scrollbar{display:none}
+    .chat-msg{display:inline-flex;align-items:flex-start;gap:6px;background:rgba(0,0,0,0.55);backdrop-filter:blur(5px);border-radius:10px;padding:6px 10px;max-width:100%;animation:slideIn 0.3s ease;flex-shrink:0}
+    @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .chat-msg.gift-msg{background:rgba(255,215,0,0.16);border:1px solid rgba(255,215,0,0.3)}
+    .chat-msg.system-msg{background:rgba(255,255,255,0.06)}
+    .chat-username{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+    .chat-text{font-size:13px;line-height:1.3;word-break:break-word}
+
+    /* Gift floater */
+    .gift-floater{position:absolute;pointer-events:none;z-index:200;display:flex;flex-direction:column;align-items:center;gap:4px;animation:giftFloat 3s ease-out forwards}
+    .gift-emoji{font-size:54px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5))}
+    .gift-from{font-size:11px;font-weight:700;color:var(--gold);background:rgba(0,0,0,0.65);border-radius:20px;padding:2px 10px}
+    @keyframes giftFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-150px) scale(1.3)}100%{opacity:0;transform:translateY(-240px) scale(0.5)}}
+
+    /* Sidebar — host controls */
+    .action-sidebar{position:absolute;bottom:130px;right:10px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
+    .action-btn{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:white;cursor:pointer}
+    .action-icon{width:46px;height:46px;backdrop-filter:blur(10px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,0.12)}
+    .action-icon.active-red{background:rgba(255,59,48,0.35);border:1px solid var(--live)}
+    .action-count{font-size:10px;font-weight:600}
+
+    /* Bottom */
+    .live-bottom{position:absolute;bottom:0;left:0;right:0;padding:10px 12px 28px;display:flex;gap:8px;align-items:center;z-index:10}
+    .chat-input{flex:1;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:10px 14px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
+    .chat-input::placeholder{color:rgba(255,255,255,0.45)}
+    .send-btn{width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+    /* Top Gifters panel */
+    .gifters-panel{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);display:none;align-items:flex-end}
+    .gifters-panel.open{display:flex}
+    .gifters-sheet{background:#111;border-radius:20px 20px 0 0;padding:0 0 40px;width:100%;max-height:60vh;overflow-y:auto}
+    .gifters-sheet::-webkit-scrollbar{display:none}
+    .gifters-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:12px auto 0}
+    .gifters-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+    .gifters-title{font-size:16px;font-weight:700}
+    .gifters-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+    .gifter-item{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .gifter-rank{width:28px;font-size:16px;font-weight:800;color:var(--muted);text-align:center;flex-shrink:0}
+    .gifter-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0}
+    .gifter-info{flex:1}
+    .gifter-name{font-size:14px;font-weight:700}
+    .gifter-handle{font-size:12px;color:var(--muted)}
+    .gifter-coins{font-size:14px;font-weight:800;color:var(--gold)}
+    .gifters-empty{text-align:center;padding:32px;color:var(--muted);font-size:14px}
+
+    /* Target flash */
+    .target-flash{position:fixed;inset:0;z-index:250;pointer-events:none;display:none;align-items:center;justify-content:center}
+    .target-flash.show{display:flex;animation:flashIn 0.4s ease}
+    @keyframes flashIn{0%{opacity:0;transform:scale(0.7)}100%{opacity:1;transform:scale(1)}}
+    .target-flash-card{background:linear-gradient(135deg,#1a1400,#2a2000);border:2px solid var(--gold);border-radius:20px;padding:24px 32px;text-align:center}
+
+    /* Ended */
+    .ended-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:32px}
+    .ended-overlay.show{display:flex}
+    .ended-btn{background:var(--accent);border:none;border-radius:12px;color:white;padding:14px 32px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
+
+    /* Toast */
+    .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;color:white;z-index:999;display:none;white-space:nowrap;pointer-events:none}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- SETUP SCREEN -->
+<div id="setupScreen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="history.back()">←</button>
+    <span class="page-logo">🔴 GO LIVE</span>
+    <span style="width:32px"></span>
+  </div>
+  <div class="container">
+    <div class="setup-preview">
+      <video id="setupPreview" autoplay muted playsinline></video>
+      <div class="preview-off" id="previewOff">
+        <div class="icon">📷</div>
+        <p>Kamera belum aktif</p>
+      </div>
+    </div>
+    <div class="section">
+      <button class="cam-btn" onclick="startCamera()">📷 Aktifkan Kamera & Mikrofon</button>
+    </div>
+    <div class="section">
+      <div class="section-label">Tajuk Live</div>
+      <input type="text" id="liveTitle" placeholder="Apa yang kau nak share? 🎉" maxlength="80"/>
+    </div>
+    <div class="section">
+      <div class="section-label">Target Gift (Optional)</div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Set Target Gift 🎯</div><div class="toggle-sub">Progress bar untuk viewers</div></div>
+        <div class="toggle-switch" id="targetToggle" onclick="toggleTarget()"></div>
+      </div>
+      <div class="target-fields" id="targetFields">
+        <input type="text" id="targetTitle" placeholder="Nama target (cth: Beli Guitar 🎸)" maxlength="60"/>
+        <div class="section-label" style="margin-bottom:4px">Pilih jumlah coins</div>
+        <div class="preset-grid">
+          <div class="preset-btn" onclick="setPreset(500,this)"><div class="preset-coins">💎 500</div><div class="preset-label">Kecil</div></div>
+          <div class="preset-btn" onclick="setPreset(1000,this)"><div class="preset-coins">💎 1K</div><div class="preset-label">Sederhana</div></div>
+          <div class="preset-btn" onclick="setPreset(2500,this)"><div class="preset-coins">💎 2.5K</div><div class="preset-label">Besar</div></div>
+          <div class="preset-btn" onclick="setPreset(5000,this)"><div class="preset-coins">💎 5K</div><div class="preset-label">Mega</div></div>
+          <div class="preset-btn" onclick="setPreset(10000,this)"><div class="preset-coins">💎 10K</div><div class="preset-label">Gila</div></div>
+          <div class="preset-btn" onclick="focusCustom()"><div class="preset-coins">✏️</div><div class="preset-label">Custom</div></div>
+        </div>
+        <input type="number" id="targetCoins" placeholder="Jumlah coins" min="100" max="100000"/>
+      </div>
+    </div>
+    <button class="golive-btn" id="goLiveBtn" onclick="startLive()" disabled>🔴 GO LIVE</button>
+  </div>
+</div>
+
+<!-- LIVE SCREEN -->
+<div class="live-screen" id="liveScreen">
+  <video id="livePreview" autoplay muted playsinline></video>
+  <div class="live-overlay"></div>
+
+  <div class="live-top">
+    <div class="live-badge">LIVE</div>
+    <div class="viewer-badge">👁 <span id="viewerCount">0</span></div>
+    <div class="coins-badge">💎 <span id="coinsEarned">0</span></div>
+    <button class="end-btn" onclick="confirmEndLive()">End</button>
+  </div>
+
+  <div class="live-target-bar" id="liveTargetBar">
+    <div class="ltb-row">
+      <span class="ltb-title">🎯 <span id="ltbTitle">Target</span></span>
+      <span class="ltb-amounts">💎 <span id="ltbCurrent">0</span> / <span id="ltbGoal">0</span></span>
+    </div>
+    <div class="ltb-bg"><div class="ltb-fill" id="ltbFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Chat — scrollable container -->
+  <div class="live-chat-host" id="liveChatHost"></div>
+
+  <!-- Host sidebar controls -->
+  <div class="action-sidebar">
+    <!-- Flip camera -->
+    <button class="action-btn" onclick="flipCamera()">
+      <div class="action-icon">🔄</div>
+      <span class="action-count">Flip</span>
+    </button>
+    <!-- ✅ NEW: Mute/Unmute mic -->
+    <button class="action-btn" id="muteBtn" onclick="toggleMute()">
+      <div class="action-icon" id="muteIcon">🎙️</div>
+      <span class="action-count" id="muteLabel">Mic On</span>
+    </button>
+    <!-- ✅ NEW: Share live link -->
+    <button class="action-btn" onclick="shareLiveLink()">
+      <div class="action-icon">🔗</div>
+      <span class="action-count">Share</span>
+    </button>
+    <!-- ✅ NEW: Top gifters -->
+    <button class="action-btn" onclick="openGifters()">
+      <div class="action-icon">🏆</div>
+      <span class="action-count">Top Gift</span>
+    </button>
+  </div>
+
+  <div class="live-bottom">
+    <input class="chat-input" id="chatInputHost" placeholder="Chat..."/>
+    <button class="send-btn" onclick="sendHostChat()">➤</button>
+  </div>
+</div>
+
+<!-- Target flash -->
+<div class="target-flash" id="targetFlash">
+  <div class="target-flash-card">
+    <div style="font-size:52px">🎯🎉</div>
+    <div style="font-size:18px;font-weight:800;color:var(--gold);margin-top:8px">Target Tercapai!</div>
+  </div>
+</div>
+
+<!-- Ended overlay -->
+<div class="ended-overlay" id="endedOverlay">
+  <div style="font-size:60px">🎉</div>
+  <div style="font-size:24px;font-weight:700">Live Tamat!</div>
+  <div style="font-size:16px;color:var(--gold)">💎 <span id="finalCoins">0</span> coins dikumpul</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:4px">70% pendapatan kau</div>
+  <button class="ended-btn" onclick="window.location.href='index.html'">Kembali ke Feed</button>
+</div>
+
+<!-- ✅ NEW: Top Gifters Panel -->
+<div class="gifters-panel" id="giftersPanel" onclick="closeGiftersOnOverlay(event)">
+  <div class="gifters-sheet">
+    <div class="gifters-handle"></div>
+    <div class="gifters-header">
+      <span class="gifters-title">🏆 Top Gifters Sesi Ini</span>
+      <button class="gifters-close" onclick="closeGifters()">✕</button>
+    </div>
+    <div id="giftersList"><div class="gifters-empty">Belum ada gift lagi...</div></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────
+let currentUser = null, currentProfile = null;
+let localStream = null, roomId = null;
+let sigChannel = null, chatChannel = null, giftChannel = null;
+let peerConnections = {};
+let facingMode = 'user';
+let viewerCount = 0;
+let targetEnabled = false;
+let liveTarget = null;
+let totalCoinsEarned = 0;
+let giftTypes = [];
+let isEnding = false;
+let isMuted = false;
+let heartbeatInterval = null;
+
+// ✅ Track top gifters in this session: { senderId: { name, avatar, coins } }
+let topGifters = {};
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ]
+};
+
+function showToast(msg, ms = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ── INIT ────────────────────────────────────────
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  currentProfile = await getCurrentProfile();
+  const { data: gifts } = await sb.from('gift_types').select('*').eq('is_active', true);
+  giftTypes = gifts || [];
+}
+
+// ── CAMERA ──────────────────────────────────────
+async function startCamera() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 30 } },
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    document.getElementById('setupPreview').srcObject = localStream;
+    document.getElementById('previewOff').style.display = 'none';
+    document.getElementById('goLiveBtn').disabled = false;
+  } catch(e) {
+    alert('Gagal akses kamera/mikrofon: ' + e.message);
+  }
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 } },
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    for (const conn of Object.values(peerConnections)) {
+      const vt = newStream.getVideoTracks()[0];
+      const sender = conn.pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && vt) await sender.replaceTrack(vt);
+    }
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    localStream = newStream;
+    document.getElementById('livePreview').srcObject = localStream;
+  } catch(e) { alert('Gagal flip: ' + e.message); }
+}
+
+// ✅ NEW: Mute/Unmute mic
+function toggleMute() {
+  if (!localStream) return;
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+  const icon = document.getElementById('muteIcon');
+  const label = document.getElementById('muteLabel');
+  const btn = document.getElementById('muteBtn');
+  icon.textContent = isMuted ? '🔇' : '🎙️';
+  label.textContent = isMuted ? 'Mic Off' : 'Mic On';
+  icon.className = isMuted ? 'action-icon active-red' : 'action-icon';
+  showToast(isMuted ? '🔇 Mic dimatikan' : '🎙️ Mic dihidupkan');
+  // Broadcast mic status to chat
+  chatChannel?.send({
+    type: 'broadcast', event: 'message',
+    payload: { username: currentProfile.username, text: isMuted ? '🔇 Host matikan mic' : '🎙️ Host hidupkan mic', isSystem: true }
+  });
+}
+
+// ✅ NEW: Share live link
+async function shareLiveLink() {
+  if (!roomId) return;
+  const url = `${window.location.origin}/live.html?id=${roomId}`;
+  if (navigator.share) {
+    navigator.share({ title: `${currentProfile.display_name || currentProfile.username} tengah LIVE!`, text: '🔴 Jom tonton live stream ni!', url });
+  } else {
+    await navigator.clipboard.writeText(url);
+    showToast('🔗 Link live disalin!');
+  }
+}
+
+// ── TARGET ───────────────────────────────────────
+function toggleTarget() {
+  targetEnabled = !targetEnabled;
+  document.getElementById('targetToggle').classList.toggle('on', targetEnabled);
+  document.getElementById('targetFields').classList.toggle('show', targetEnabled);
+}
+function setPreset(coins, el) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('targetCoins').value = coins;
+}
+function focusCustom() {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('targetCoins').focus();
+}
+
+// ── GO LIVE ──────────────────────────────────────
+async function startLive() {
+  const title = document.getElementById('liveTitle').value.trim() || 'Live Stream 🔴';
+  const btn = document.getElementById('goLiveBtn');
+  btn.disabled = true; btn.textContent = 'Starting...';
+
+  const { data: room, error } = await sb.from('live_rooms')
+    .insert({ host_id: currentUser.id, title, status: 'live' })
+    .select().single();
+
+  if (error) { alert('Gagal: ' + error.message); btn.disabled = false; btn.textContent = '🔴 GO LIVE'; return; }
+  roomId = room.id;
+
+  if (targetEnabled) {
+    const tTitle = document.getElementById('targetTitle').value.trim() || 'Target Gift';
+    const tCoins = parseInt(document.getElementById('targetCoins').value) || 1000;
+    const { data: t } = await sb.from('gift_targets')
+      .insert({ room_id: roomId, host_id: currentUser.id, title: tTitle, target_coins: tCoins })
+      .select().single();
+    liveTarget = t;
+    updateTargetBar();
+  }
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('liveScreen').style.display = 'block';
+  document.getElementById('livePreview').srcObject = localStream;
+
+  startSignaling();
+  startChatChannel();
+  listenForGifts();
+  startHeartbeat();
+}
+
+// ── SIGNALING ────────────────────────────────────
+function startSignaling() {
+  sigChannel = sb.channel(`webrtc-sig-${roomId}`, { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'viewer-join' }, async ({ payload }) => {
+      addHostChat('', `👋 viewer joined`, false, true);
+      await createPeerForViewer(payload.viewerId);
+    })
+    .on('broadcast', { event: 'answer' }, async ({ payload }) => {
+      const conn = peerConnections[payload.from];
+      if (!conn) return;
+      try {
+        await conn.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: payload.sdp }));
+        for (const c of conn.iceCandidateBuffer) await conn.pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        conn.iceCandidateBuffer = [];
+      } catch(e) { console.error('Answer error:', e); }
+    })
+    .on('broadcast', { event: 'ice-from-viewer' }, async ({ payload }) => {
+      const conn = peerConnections[payload.from];
+      if (!conn || !payload.candidate) return;
+      try {
+        if (conn.pc.remoteDescription) await conn.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        else conn.iceCandidateBuffer.push(payload.candidate);
+      } catch(e) {}
+    })
+    .on('broadcast', { event: 'viewer-leave' }, ({ payload }) => {
+      const conn = peerConnections[payload.viewerId];
+      if (conn) { conn.pc.close(); delete peerConnections[payload.viewerId]; }
+    })
+    .subscribe();
+}
+
+async function createPeerForViewer(viewerId) {
+  if (peerConnections[viewerId]) peerConnections[viewerId].pc.close();
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConnections[viewerId] = { pc, iceCandidateBuffer: [] };
+
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+  pc.onicecandidate = ({ candidate }) => {
+    if (candidate) sigChannel.send({ type: 'broadcast', event: 'ice-from-host', payload: { to: viewerId, candidate: candidate.toJSON() } });
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') {
+      // ✅ FIX: viewer count managed via broadcast events, not connection state
+    } else if (['disconnected','failed','closed'].includes(pc.connectionState)) {
+      delete peerConnections[viewerId];
+    }
+  };
+
+  try {
+    const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+    await pc.setLocalDescription(offer);
+    await sigChannel.send({ type: 'broadcast', event: 'offer', payload: { to: viewerId, sdp: offer.sdp } });
+  } catch(e) { console.error('Offer error:', e); }
+}
+
+// ── CHAT CHANNEL ─────────────────────────────────
+function startChatChannel() {
+  chatChannel = sb.channel(`live-chat-${roomId}`, { config: { broadcast: { self: true } } })
+    .on('broadcast', { event: 'message' }, ({ payload }) => {
+      addHostChat(payload.username, payload.text, payload.isGift || false, payload.isSystem || false);
+    })
+    // ✅ FIX: viewer count via broadcast (realtime, no DB polling)
+    .on('broadcast', { event: 'viewer-joined' }, ({ payload }) => {
+      viewerCount++;
+      document.getElementById('viewerCount').textContent = viewerCount;
+      // Persist to DB every 5 viewers or on join
+      if (viewerCount % 5 === 0) sb.from('live_rooms').update({ viewer_count: viewerCount }).eq('id', roomId);
+    })
+    .on('broadcast', { event: 'viewer-left' }, () => {
+      viewerCount = Math.max(0, viewerCount - 1);
+      document.getElementById('viewerCount').textContent = viewerCount;
+    })
+    .subscribe();
+}
+
+// ── GIFT LISTENER ─────────────────────────────────
+function listenForGifts() {
+  giftChannel = sb.channel(`gifts-host-${roomId}`)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'live_gifts', filter: `room_id=eq.${roomId}`
+    }, async ({ new: gift }) => {
+      const gt = giftTypes.find(g => g.id === gift.gift_type_id);
+      const { data: sender } = await sb.from('profiles').select('id,username,display_name,avatar_url').eq('id', gift.sender_id).maybeSingle();
+
+      if (gt && sender) {
+        showGiftAnimation(gt.emoji, sender.username);
+        addHostChat(sender.username, `🎁 ${gt.name} ${gt.emoji} (${gt.coin_cost} 💎)`, true);
+
+        // ✅ NEW: Track top gifters for this session
+        const id = sender.id;
+        if (!topGifters[id]) {
+          topGifters[id] = { name: sender.display_name || sender.username, username: sender.username, avatar: getAvatarUrl(sender), coins: 0 };
+        }
+        topGifters[id].coins += gift.coin_amount;
+      }
+
+      totalCoinsEarned += gift.coin_amount;
+      document.getElementById('coinsEarned').textContent = formatCount(totalCoinsEarned);
+
+      if (liveTarget && !liveTarget.is_completed) {
+        liveTarget.current_coins += gift.coin_amount;
+        if (liveTarget.current_coins >= liveTarget.target_coins) { liveTarget.is_completed = true; showTargetComplete(); }
+        updateTargetBar();
+      }
+    })
+    .subscribe();
+}
+
+function updateTargetBar() {
+  if (!liveTarget) return;
+  document.getElementById('liveTargetBar').classList.add('show');
+  document.getElementById('ltbTitle').textContent = liveTarget.title;
+  document.getElementById('ltbCurrent').textContent = formatCount(liveTarget.current_coins);
+  document.getElementById('ltbGoal').textContent = formatCount(liveTarget.target_coins);
+  const pct = Math.min(100, Math.round((liveTarget.current_coins / liveTarget.target_coins) * 100));
+  document.getElementById('ltbFill').style.width = pct + '%';
+}
+
+function showTargetComplete() {
+  const el = document.getElementById('targetFlash');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function showGiftAnimation(emoji, username) {
+  const el = document.createElement('div');
+  el.className = 'gift-floater';
+  el.style.left = (10 + Math.random() * 65) + '%';
+  el.style.bottom = '140px';
+  el.innerHTML = `<div class="gift-emoji">${emoji}</div><div class="gift-from">${username}</div>`;
+  document.getElementById('liveScreen').appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+
+// ✅ NEW: Top Gifters panel
+function openGifters() {
+  const list = document.getElementById('giftersList');
+  const sorted = Object.values(topGifters).sort((a, b) => b.coins - a.coins);
+
+  if (!sorted.length) {
+    list.innerHTML = '<div class="gifters-empty">Belum ada gift lagi...<br>Minta viewers hantar gift! 🎁</div>';
+  } else {
+    const medals = ['🥇','🥈','🥉'];
+    list.innerHTML = sorted.slice(0, 20).map((g, i) => `
+      <div class="gifter-item">
+        <div class="gifter-rank">${medals[i] || (i + 1)}</div>
+        <img class="gifter-avatar" src="${g.avatar}" alt="${g.name}" />
+        <div class="gifter-info">
+          <div class="gifter-name">${g.name}</div>
+          <div class="gifter-handle">@${g.username}</div>
+        </div>
+        <div class="gifter-coins">💎 ${formatCount(g.coins)}</div>
+      </div>`).join('');
+  }
+  document.getElementById('giftersPanel').classList.add('open');
+}
+
+function closeGifters() { document.getElementById('giftersPanel').classList.remove('open'); }
+function closeGiftersOnOverlay(e) { if (e.target === e.currentTarget) closeGifters(); }
+
+// ── HOST CHAT ─────────────────────────────────────
+function addHostChat(username, text, isGift = false, isSystem = false) {
+  const chat = document.getElementById('liveChatHost');
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isGift ? ' gift-msg' : '') + (isSystem ? ' system-msg' : '');
+  if (isSystem) div.innerHTML = `<span class="chat-text" style="color:rgba(255,255,255,0.5)">${text}</span>`;
+  else div.innerHTML = `<span class="chat-username">${username}</span><span class="chat-text">${text}</span>`;
+  chat.appendChild(div);
+  // ✅ FIX: Auto scroll to bottom
+  chat.scrollTop = chat.scrollHeight;
+  // Keep max 50 messages
+  while (chat.children.length > 50) chat.removeChild(chat.firstChild);
+}
+
+async function sendHostChat() {
+  const input = document.getElementById('chatInputHost');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  chatChannel?.send({ type: 'broadcast', event: 'message', payload: { username: currentProfile.username, text } });
+}
+
+// ── HEARTBEAT ─────────────────────────────────────
+function startHeartbeat() {
+  heartbeatInterval = setInterval(async () => {
+    if (roomId && !isEnding) {
+      await sb.from('live_rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId).eq('status', 'live');
+    }
+  }, 30000);
+}
+
+// ── END LIVE ──────────────────────────────────────
+function confirmEndLive() {
+  if (confirm('Akhiri live stream sekarang?')) endLive();
+}
+
+async function endLive() {
+  if (isEnding || !roomId) return;
+  isEnding = true;
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+  try {
+    await sb.from('live_rooms').update({
+      status: 'ended', ended_at: new Date().toISOString(),
+      viewer_count: 0, total_coins_earned: totalCoinsEarned
+    }).eq('id', roomId).eq('status', 'live');
+
+    chatChannel?.send({ type: 'broadcast', event: 'live-ended', payload: { roomId } });
+    sigChannel?.send({ type: 'broadcast', event: 'live-ended', payload: { roomId } });
+  } catch(e) { console.error(e); }
+
+  Object.values(peerConnections).forEach(conn => { try { conn.pc.close(); } catch(e) {} });
+  peerConnections = {};
+  if (localStream) localStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+  localStream = null;
+  try { sb.removeAllChannels(); } catch(e) {}
+
+  document.getElementById('finalCoins').textContent = formatCount(Math.floor(totalCoinsEarned * 0.7));
+  document.getElementById('liveScreen').style.display = 'none';
+  document.getElementById('endedOverlay').classList.add('show');
+}
+
+// Auto-end if tab/browser closes
+window.addEventListener('beforeunload', () => {
+  if (roomId && !isEnding) {
+    const url = `${SUPABASE_URL}/rest/v1/live_rooms?id=eq.${roomId}&status=eq.live`;
+    navigator.sendBeacon(url, new Blob([JSON.stringify({ status: 'ended', ended_at: new Date().toISOString(), viewer_count: 0 })], { type: 'application/json' }));
+  }
+});
+
+document.getElementById('chatInputHost').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendHostChat();
+});
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

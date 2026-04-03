@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBES — For You</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg:#000; --surface:#111; --border:#222; --accent:#ff2d55; --accent2:#ff6b35; --text:#fff; --muted:#888; --nav-h:60px; }
+    html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); overflow: hidden; }
+
+    .top-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: var(--nav-h); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    /* ✅ FIX: Tabs use explicit IDs */
+    .nav-tabs { display: flex; gap: 24px; align-items: center; }
+    .nav-tab { font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.5); cursor: pointer; padding-bottom: 4px; transition: color 0.2s; border: none; background: none; border-bottom: 2px solid transparent; }
+    .nav-tab.active { color: white; border-bottom-color: white; }
+
+    .nav-right { display: flex; gap: 12px; align-items: center; }
+    .btn-icon { width: 38px; height: 38px; background: rgba(255,255,255,0.1); border: none; border-radius: 50%; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .feed { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; -webkit-overflow-scrolling: touch; }
+    .feed::-webkit-scrollbar { display: none; }
+
+    .video-item { height: 100vh; scroll-snap-align: start; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+    video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; cursor: pointer; }
+
+    .video-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.85) 100%); pointer-events: none; }
+
+    .play-indicator { position: absolute; font-size: 60px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .play-indicator.show { opacity: 1; animation: fadeOut 0.8s ease forwards 0.2s; }
+    @keyframes fadeOut { to { opacity: 0; transform: scale(1.3); } }
+
+    .video-info { position: absolute; bottom: calc(80px + env(safe-area-inset-bottom, 16px)); left: 16px; right: 80px; }
+    .video-user { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; text-decoration: none; }
+    .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+    .user-name { font-size: 15px; font-weight: 600; color: white; }
+    .follow-inline-btn { font-size: 12px; background: var(--accent); border: none; border-radius: 4px; color: white; padding: 2px 8px; cursor: pointer; margin-left: 4px; }
+    .video-desc { font-size: 14px; color: rgba(255,255,255,0.9); line-height: 1.5; margin-bottom: 6px; }
+    .tag { color: rgba(255,255,255,0.7); font-size: 13px; margin-right: 4px; }
+
+    .action-sidebar { position: absolute; bottom: calc(80px + env(safe-area-inset-bottom, 16px)); right: 12px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; background: none; border: none; color: white; }
+    .action-icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; transition: transform 0.15s, background 0.2s; }
+    .action-btn.liked .action-icon { background: rgba(255,45,85,0.3); }
+    .action-count { font-size: 12px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+
+    .avatar-action { position: relative; cursor: pointer; }
+    .avatar-action img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid white; }
+    .follow-dot { position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); width: 20px; height: 20px; background: var(--accent); border-radius: 50%; border: 2px solid black; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; color: white; }
+
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; height: calc(70px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); background: linear-gradient(to top, rgba(0,0,0,0.97), rgba(0,0,0,0.8)); display: flex; align-items: center; justify-content: space-around; border-top: 1px solid rgba(255,255,255,0.05); }
+    .bottom-tab { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); text-decoration: none; font-size: 10px; font-weight: 500; transition: color 0.2s; position: relative; }
+    .bottom-tab.active { color: white; }
+    .upload-tab { background: linear-gradient(135deg, var(--accent), var(--accent2)); width: 46px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; box-shadow: 0 4px 15px rgba(255,45,85,0.4); }
+    .notif-dot { position: absolute; top: -2px; right: -2px; background: var(--accent); color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; min-width: 16px; text-align: center; display: none; }
+
+    /* Comment drawer */
+    .drawer-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); display: none; }
+    .drawer-overlay.open { display: block; }
+    .comment-drawer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 201; background: #111; border-radius: 20px 20px 0 0; max-height: 70vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .comment-drawer.open { transform: translateY(0); }
+    .drawer-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .drawer-title { font-size: 16px; font-weight: 600; }
+    .drawer-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+    .comments-list { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .comments-list::-webkit-scrollbar { display: none; }
+    .comment-item { display: flex; gap: 12px; margin-bottom: 20px; }
+    .comment-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .comment-body { flex: 1; }
+    .comment-username { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .comment-text { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.4; }
+    .comment-time { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .comment-input-row { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+    .comment-input-row input { flex: 1; background: var(--border); border: none; border-radius: 24px; padding: 10px 16px; color: white; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
+    .send-btn { background: var(--accent); border: none; border-radius: 50%; width: 38px; height: 38px; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .loader { height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--muted); }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    .liked .action-icon { animation: heartPop 0.3s ease; }
+    .empty-feed { height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--muted); text-align: center; padding: 40px; }
+    .empty-feed .big-emoji { font-size: 60px; }
+    .empty-feed h3 { font-size: 20px; color: white; }
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="logo">VIBES</span>
+  <div class="nav-tabs">
+    <!-- ✅ FIX: use switchFeed('following') not window.location -->
+    <button class="nav-tab" id="tabFollowing" onclick="switchFeed('following')">Following</button>
+    <button class="nav-tab active" id="tabForYou" onclick="switchFeed('foryou')">For You</button>
+  </div>
+  <div class="nav-right">
+    <button class="btn-icon" onclick="window.location.href='search.html'">🔍</button>
+  </div>
+</nav>
+
+<main class="feed" id="feed">
+  <div class="loader"><div class="spinner"></div><p>Loading vibes...</p></div>
+</main>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab active" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeComments()"></div>
+<div class="comment-drawer" id="commentDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">Comments <span id="commentCount">0</span></span>
+    <button class="drawer-close" onclick="closeComments()">✕</button>
+  </div>
+  <div class="comments-list" id="commentsList"></div>
+  <div class="comment-input-row">
+    <input type="text" id="commentInput" placeholder="Add a comment..." />
+    <button class="send-btn" onclick="postComment()">➤</button>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+let currentProfile = null;
+let activeCommentVideoId = null;
+let videos = [];
+let page = 0;
+const PAGE_SIZE = 5;
+let loading = false;
+let hasMore = true;
+let currentFeed = 'foryou'; // ✅ track active tab
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (currentUser) {
+    currentProfile = await getCurrentProfile();
+    loadUnreadCount();
+  }
+  await loadVideos();
+  setupIntersectionObserver();
+}
+
+async function loadUnreadCount() {
+  const { count } = await sb.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('is_read', false);
+  if (count > 0) {
+    const badge = document.getElementById('notifBadge');
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'block';
+  }
+}
+
+// ✅ FIX: switchFeed function for tabs
+async function switchFeed(feed) {
+  if (feed === currentFeed) return;
+  currentFeed = feed;
+
+  // Update tab UI
+  document.getElementById('tabFollowing').classList.toggle('active', feed === 'following');
+  document.getElementById('tabForYou').classList.toggle('active', feed === 'foryou');
+
+  // Reset and reload
+  videos = []; page = 0; hasMore = true;
+  document.getElementById('feed').innerHTML = '<div class="loader"><div class="spinner"></div><p>Loading...</p></div>';
+  await loadVideos();
+}
+
+async function loadVideos() {
+  if (loading || !hasMore) return;
+  loading = true;
+
+  let query = sb.from('videos').select('*, profiles(id, username, display_name, avatar_url)').eq('is_public', true);
+
+  if (currentFeed === 'following' && currentUser) {
+    // Get following IDs first
+    const { data: follows } = await sb.from('follows').select('following_id').eq('follower_id', currentUser.id);
+    const ids = follows?.map(f => f.following_id) || [];
+    if (ids.length === 0) {
+      document.getElementById('feed').innerHTML = `
+        <div class="empty-feed">
+          <div class="big-emoji">👥</div>
+          <h3>Follow seseorang dulu!</h3>
+          <p>Video dari orang yang kau follow akan muncul di sini.</p>
+        </div>`;
+      loading = false; return;
+    }
+    query = query.in('user_id', ids);
+  }
+
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+  if (error) { console.error(error); loading = false; return; }
+
+  const feed = document.getElementById('feed');
+  if (page === 0) {
+    feed.innerHTML = '';
+    if (!data || data.length === 0) {
+      feed.innerHTML = `<div class="empty-feed"><div class="big-emoji">🎬</div><h3>Tiada video lagi!</h3><p>Jadi yang pertama upload.</p><a href="upload.html" style="color:var(--accent);font-weight:600;margin-top:8px;">Upload now →</a></div>`;
+      loading = false; return;
+    }
+  }
+
+  if (data.length < PAGE_SIZE) hasMore = false;
+
+  // Get liked videos
+  let likedIds = new Set();
+  if (currentUser && data.length > 0) {
+    const { data: likes } = await sb.from('likes').select('video_id').eq('user_id', currentUser.id).in('video_id', data.map(v => v.id));
+    if (likes) likes.forEach(l => likedIds.add(l.video_id));
+  }
+
+  data.forEach(video => { videos.push(video); feed.appendChild(createVideoItem(video, likedIds.has(video.id))); });
+  page++;
+  loading = false;
+}
+
+function createVideoItem(video, isLiked) {
+  const profile = video.profiles;
+  const avatarSrc = getAvatarUrl(profile);
+  const desc = video.description || video.title || '';
+  const tags = desc.match(/#\w+/g) || [];
+  const cleanDesc = desc.replace(/#\w+/g, '').trim();
+  const el = document.createElement('div');
+  el.className = 'video-item';
+  el.dataset.videoId = video.id;
+  el.innerHTML = `
+    <video src="${video.video_url}" loop playsinline preload="metadata" onclick="togglePlay(this,'${video.id}')"></video>
+    <div class="video-overlay"></div>
+    <div class="play-indicator" id="playInd_${video.id}">⏸</div>
+    <div class="video-info">
+      <a class="video-user" href="profile.html?id=${profile?.id}">
+        <img class="user-avatar" src="${avatarSrc}" alt="${profile?.display_name}" />
+        <span class="user-name">@${profile?.username || 'unknown'}</span>
+        ${currentUser && currentUser.id !== profile?.id ? `<button class="follow-inline-btn" onclick="toggleFollow(event,'${profile?.id}')">Follow</button>` : ''}
+      </a>
+      ${cleanDesc ? `<p class="video-desc">${cleanDesc.substring(0,100)}</p>` : ''}
+      <div>${tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </div>
+    <div class="action-sidebar">
+      <div class="avatar-action" onclick="window.location.href='profile.html?id=${profile?.id}'">
+        <img src="${avatarSrc}" alt="${profile?.display_name}" />
+        ${currentUser && currentUser.id !== profile?.id ? `<div class="follow-dot" onclick="toggleFollow(event,'${profile?.id}')">+</div>` : ''}
+      </div>
+      <button class="action-btn ${isLiked ? 'liked' : ''}" id="likeBtn_${video.id}" onclick="toggleLike('${video.id}')">
+        <div class="action-icon">${isLiked ? '❤️' : '🤍'}</div>
+        <span class="action-count" id="likeCount_${video.id}">${formatCount(video.likes_count)}</span>
+      </button>
+      <button class="action-btn" onclick="openComments('${video.id}',${video.comments_count})">
+        <div class="action-icon">💬</div>
+        <span class="action-count">${formatCount(video.comments_count)}</span>
+      </button>
+      <button class="action-btn" onclick="shareVideo('${video.id}')">
+        <div class="action-icon">↗️</div>
+        <span class="action-count">Share</span>
+      </button>
+    </div>`;
+  return el;
+}
+
+function setupIntersectionObserver() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const vid = entry.target.querySelector('video');
+      if (!vid) return;
+      if (entry.isIntersecting && entry.intersectionRatio > 0.7) {
+        vid.play().catch(() => {});
+      } else { vid.pause(); }
+    });
+  }, { threshold: 0.7 });
+
+  const feed = document.getElementById('feed');
+  new MutationObserver(() => {
+    feed.querySelectorAll('.video-item').forEach(item => observer.observe(item));
+  }).observe(feed, { childList: true });
+  feed.querySelectorAll('.video-item').forEach(item => observer.observe(item));
+}
+
+document.getElementById('feed').addEventListener('scroll', function() {
+  if (this.scrollTop + this.clientHeight >= this.scrollHeight - 300) loadVideos();
+});
+
+function togglePlay(vid, videoId) {
+  const ind = document.getElementById('playInd_' + videoId);
+  if (vid.paused) { vid.play(); ind.textContent = '▶️'; }
+  else { vid.pause(); ind.textContent = '⏸'; }
+  ind.classList.remove('show'); void ind.offsetWidth; ind.classList.add('show');
+}
+
+async function toggleLike(videoId) {
+  if (!currentUser) return window.location.href = 'auth.html';
+  const btn = document.getElementById('likeBtn_' + videoId);
+  const countEl = document.getElementById('likeCount_' + videoId);
+  const isLiked = btn.classList.contains('liked');
+  btn.classList.toggle('liked');
+  btn.querySelector('.action-icon').textContent = isLiked ? '🤍' : '❤️';
+  if (isLiked) await sb.from('likes').delete().eq('user_id', currentUser.id).eq('video_id', videoId);
+  else await sb.from('likes').insert({ user_id: currentUser.id, video_id: videoId });
+  const { data } = await sb.from('videos').select('likes_count').eq('id', videoId).single();
+  if (data) countEl.textContent = formatCount(data.likes_count);
+}
+
+async function openComments(videoId, count) {
+  activeCommentVideoId = videoId;
+  document.getElementById('commentCount').textContent = count;
+  document.getElementById('commentsList').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading...</div>';
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('commentDrawer').classList.add('open');
+  const { data } = await sb.from('comments').select('*, profiles(username, display_name, avatar_url)').eq('video_id', videoId).order('created_at', { ascending: false }).limit(50);
+  const list = document.getElementById('commentsList');
+  if (!data || data.length === 0) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Tiada komen lagi. Jadi yang pertama!</div>'; return; }
+  list.innerHTML = data.map(c => `<div class="comment-item"><img class="comment-avatar" src="${getAvatarUrl(c.profiles)}" /><div class="comment-body"><div class="comment-username">@${c.profiles?.username}</div><div class="comment-text">${c.content}</div><div class="comment-time">${timeAgo(c.created_at)}</div></div></div>`).join('');
+}
+
+function closeComments() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('commentDrawer').classList.remove('open');
+}
+
+async function postComment() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await sb.from('comments').insert({ user_id: currentUser.id, video_id: activeCommentVideoId, content: text });
+  await openComments(activeCommentVideoId, 0);
+}
+
+async function toggleFollow(event, userId) {
+  event.preventDefault(); event.stopPropagation();
+  if (!currentUser) return window.location.href = 'auth.html';
+  const { data: existing } = await sb.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', userId).maybeSingle();
+  if (existing) { await sb.from('follows').delete().eq('follower_id', currentUser.id).eq('following_id', userId); event.target.textContent = 'Follow'; event.target.style.background = ''; }
+  else { await sb.from('follows').insert({ follower_id: currentUser.id, following_id: userId }); event.target.textContent = 'Following'; event.target.style.background = 'rgba(255,255,255,0.2)'; }
+}
+
+async function shareVideo(videoId) {
+  const url = `${window.location.origin}/video.html?id=${videoId}`;
+  if (navigator.share) navigator.share({ title: 'Check this VIBE!', url });
+  else { await navigator.clipboard.writeText(url); alert('Link copied!'); }
+}
+
+document.getElementById('commentInput').addEventListener('keydown', e => { if (e.key === 'Enter') postComment(); });
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

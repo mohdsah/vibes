@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBES — Live Now</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root { --bg:#0a0a0a; --surface:#111; --border:#1e1e1e; --accent:#ff2d55; --accent2:#ff6b35; --text:#f0f0f0; --muted:#666; --live:#ff3b30; }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+    .top-bar { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; position:sticky; top:0; z-index:10; background:var(--bg); border-bottom:1px solid var(--border); }
+    .back-btn { background:none; border:none; color:var(--text); font-size:22px; cursor:pointer; }
+    .page-logo { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:2px; background:linear-gradient(135deg,var(--live),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .golive-link { background:var(--live); border:none; border-radius:8px; color:white; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; padding:8px 16px; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+
+    .page-title { padding:20px 20px 12px; font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .live-dot { width:10px; height:10px; background:var(--live); border-radius:50%; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.2)} }
+
+    .live-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:3px; padding:0 0 80px; }
+
+    .live-card { position:relative; aspect-ratio:9/16; background:var(--surface); overflow:hidden; cursor:pointer; }
+    .live-card-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; background:linear-gradient(135deg,#1a1a2e,#16213e); }
+    .live-card-overlay { position:absolute; inset:0; background:linear-gradient(to bottom,rgba(0,0,0,0.3) 0%,transparent 30%,rgba(0,0,0,0.85) 100%); }
+
+    .live-card-top { position:absolute; top:8px; left:8px; display:flex; gap:6px; align-items:center; }
+    .live-badge { background:var(--live); color:white; font-size:10px; font-weight:700; padding:3px 7px; border-radius:5px; letter-spacing:1px; animation:livePulse 2s infinite; }
+    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    .viewer-badge { background:rgba(0,0,0,0.65); color:white; font-size:11px; padding:3px 7px; border-radius:5px; }
+
+    .live-card-bottom { position:absolute; bottom:0; left:0; right:0; padding:10px; }
+    .card-avatar-row { display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+    .card-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; border:2px solid var(--live); }
+    .card-username { font-size:12px; font-weight:700; }
+    .card-title { font-size:11px; color:rgba(255,255,255,0.75); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+
+    .empty-state { padding:60px 20px; text-align:center; color:var(--muted); }
+    .empty-emoji { font-size:48px; margin-bottom:16px; }
+    .empty-title { font-size:18px; color:white; margin-bottom:8px; }
+    .empty-sub { font-size:14px; line-height:1.5; }
+
+    .bottom-nav { position:fixed; bottom:0; left:0; right:0; z-index:100; height:70px; background:rgba(0,0,0,0.97); display:flex; align-items:center; justify-content:space-around; border-top:1px solid var(--border); }
+    .bottom-tab { display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); text-decoration:none; font-size:10px; font-weight:500; transition:color 0.2s; position:relative; }
+    .bottom-tab.active { color:white; }
+    .upload-tab { background:linear-gradient(135deg,var(--accent),var(--accent2)); width:46px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; color:white; }
+    .notif-dot { position:absolute; top:-3px; right:-3px; background:var(--accent); color:white; font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px; min-width:16px; text-align:center; display:none; }
+    .upload-tab { background:linear-gradient(135deg,var(--accent),var(--accent2)); width:46px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; color:white; }
+
+    .spinner { width:30px; height:30px; border:3px solid var(--border); border-top-color:var(--live); border-radius:50%; animation:spin 0.8s linear infinite; margin:40px auto; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="page-logo">🔴 LIVE</span>
+  <a class="golive-link" href="go-live.html">🔴 Go Live</a>
+</div>
+
+<div class="page-title"><div class="live-dot"></div> Live Sekarang</div>
+
+<div class="live-grid" id="liveGrid">
+  <div style="grid-column:1/-1"><div class="spinner"></div></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab active" href="live-list.html">🔴<span>Live</span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+// Load notif badge
+(async () => {
+  const user = await getCurrentUser();
+  if (!user) return;
+  const { count } = await sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',user.id).eq('is_read',false);
+  // live-list doesn't have notif tab, just verify auth
+})();
+async function loadLive() {
+  // ✅ FIX: Only show rooms that are 'live' AND started within last 6 hours
+  // This prevents orphaned rooms from showing
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+  const { data: rooms } = await sb
+    .from('live_rooms')
+    .select('*, profiles(id, username, display_name, avatar_url)')
+    .eq('status', 'live')
+    .gte('started_at', sixHoursAgo)
+    .order('viewer_count', { ascending: false });
+
+  const grid = document.getElementById('liveGrid');
+
+  if (!rooms || rooms.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column:1/-1">
+        <div class="empty-state">
+          <div class="empty-emoji">📡</div>
+          <div class="empty-title">Tiada live sekarang</div>
+          <div class="empty-sub">Jadilah yang pertama go live!</div>
+          <a href="go-live.html" style="display:inline-block;margin-top:16px;background:var(--live);color:white;padding:12px 28px;border-radius:12px;font-weight:700;text-decoration:none;">🔴 Go Live</a>
+        </div>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = rooms.map(r => `
+    <div class="live-card" onclick="window.location.href='live.html?id=${r.id}'">
+      <div class="live-card-placeholder">📹</div>
+      <div class="live-card-overlay"></div>
+      <div class="live-card-top">
+        <span class="live-badge">LIVE</span>
+        <span class="viewer-badge">👁 ${r.viewer_count || 0}</span>
+      </div>
+      <div class="live-card-bottom">
+        <div class="card-avatar-row">
+          <img class="card-avatar" src="${getAvatarUrl(r.profiles)}" alt="${r.profiles?.username}"
+            onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.profiles?.username||'U')}&background=random&color=fff'" />
+          <span class="card-username">@${r.profiles?.username}</span>
+        </div>
+        <div class="card-title">${r.title || 'Live Stream'}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ✅ FIX: Realtime — reload on ANY change to live_rooms
+sb.channel('live-rooms-realtime')
+  .on('postgres_changes', {
+    event: '*',        // INSERT, UPDATE, DELETE
+    schema: 'public',
+    table: 'live_rooms'
+  }, () => {
+    loadLive();        // reload the whole list
+  })
+  .subscribe();
+
+loadLive();
+// Auto-refresh every 60 seconds as fallback
+setInterval(loadLive, 60000);
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

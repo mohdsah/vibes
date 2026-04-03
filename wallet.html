@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Wallet & Withdraw</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#666;--gold:#ffd700;--green:#22c55e}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+
+    /* Balance hero */
+    .balance-hero{margin:20px 16px;background:linear-gradient(135deg,#0a1a00,#1a2a00);border:1px solid rgba(34,197,94,0.25);border-radius:22px;padding:28px 24px;text-align:center}
+    .balance-label{font-size:12px;color:rgba(34,197,94,0.7);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px}
+    .balance-coins{font-size:48px;font-weight:900;color:var(--gold);line-height:1}
+    .balance-myr{font-size:16px;color:rgba(255,255,255,0.5);margin-top:6px}
+    .balance-note{font-size:11px;color:var(--muted);margin-top:4px}
+
+    /* Stats row */
+    .stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:0 16px;margin-bottom:24px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center}
+    .stat-num{font-size:18px;font-weight:800}
+    .stat-num.green{color:var(--green)}
+    .stat-num.gold{color:var(--gold)}
+    .stat-num.red{color:var(--accent)}
+    .stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px}
+
+    /* Rank card */
+    .rank-card{margin:0 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px}
+    .rank-emoji-big{font-size:36px}
+    .rank-info{flex:1}
+    .rank-name-display{font-size:17px;font-weight:800}
+    .rank-spent{font-size:12px;color:var(--muted);margin-top:2px}
+    .rank-progress{height:5px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-top:8px}
+    .rank-progress-fill{height:100%;border-radius:10px}
+    .rank-next{font-size:11px;color:var(--muted);margin-top:5px}
+
+    /* Section */
+    .section-title{font-size:16px;font-weight:700;padding:0 16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+
+    /* Withdraw form */
+    .withdraw-card{margin:0 16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px}
+    .form-group{margin-bottom:16px}
+    label{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px}
+    input,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:13px 15px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color 0.2s}
+    input:focus,select:focus{border-color:var(--green)}
+    input::placeholder{color:var(--muted)}
+    select option{background:var(--surface)}
+
+    .coins-slider-row{display:flex;align-items:center;gap:12px}
+    .coins-input{flex:1}
+    .coins-myr{font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap}
+
+    .min-note{font-size:12px;color:var(--muted);margin-top:6px}
+
+    .withdraw-btn{width:100%;padding:15px;background:linear-gradient(135deg,var(--green),#16a34a);border:none;border-radius:12px;color:white;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:opacity 0.2s;margin-top:4px}
+    .withdraw-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* History */
+    .history-section{padding:0 16px;margin-bottom:24px}
+    .history-tabs{display:flex;gap:8px;margin-bottom:14px}
+    .htab{flex:1;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;text-align:center;cursor:pointer;color:var(--muted)}
+    .htab.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    .history-item{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid var(--border)}
+    .history-icon{font-size:28px;flex-shrink:0}
+    .history-info{flex:1;min-width:0}
+    .history-name{font-size:14px;font-weight:600}
+    .history-date{font-size:11px;color:var(--muted);margin-top:2px}
+    .history-right{text-align:right;flex-shrink:0}
+    .history-amount{font-size:14px;font-weight:700}
+    .history-amount.green{color:var(--green)}
+    .history-amount.gold{color:var(--gold)}
+    .history-amount.red{color:var(--accent)}
+    .status-badge{font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;display:inline-block;margin-top:3px}
+    .s-pending{background:rgba(255,165,0,0.15);color:orange}
+    .s-approved,.s-paid{background:rgba(34,197,94,0.15);color:var(--green)}
+    .s-rejected{background:rgba(255,45,85,0.15);color:var(--accent)}
+
+    /* Modal */
+    .modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;padding:24px}
+    .modal-overlay.show{display:flex}
+    .modal-card{background:var(--surface);border-radius:20px;padding:28px 24px;text-align:center;width:100%;max-width:320px}
+    .modal-emoji{font-size:56px;margin-bottom:14px}
+    .modal-title{font-size:20px;font-weight:700;margin-bottom:8px}
+    .modal-sub{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:20px}
+    .modal-btn{width:100%;padding:13px;background:var(--accent);border:none;border-radius:12px;color:white;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer}
+
+    .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .error-msg{background:rgba(255,45,85,0.1);border:1px solid rgba(255,45,85,0.3);border-radius:10px;padding:12px;font-size:13px;color:var(--accent);margin-bottom:14px;display:none}
+    .error-msg.show{display:block}
+  </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+</head>
+<body>
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">💎 WALLET</span>
+  <a href="topup.html" style="color:var(--gold);font-size:13px;font-weight:700;text-decoration:none">+ Top Up</a>
+</div>
+
+<!-- BALANCE -->
+<div class="balance-hero">
+  <div class="balance-label">Baki Coins</div>
+  <div class="balance-coins" id="balCoins">—</div>
+  <div class="balance-myr">≈ RM <span id="balMYR">0.00</span></div>
+  <div class="balance-note">Kadar: 1 coin = RM 0.04 (selepas 30% yuran platform)</div>
+</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-num green" id="statEarned">0</div>
+    <div class="stat-lbl">Dikumpul</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num gold" id="statSpent">0</div>
+    <div class="stat-lbl">Dihantar</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num red" id="statWithdrawn">0</div>
+    <div class="stat-lbl">Withdraw</div>
+  </div>
+</div>
+
+<!-- DILET RANK -->
+<div class="rank-card" id="rankCard">
+  <div class="rank-emoji-big" id="rankEmoji">🪨</div>
+  <div class="rank-info">
+    <div class="rank-name-display" id="rankName">Batu</div>
+    <div class="rank-spent">💎 <span id="rankSpent">0</span> coins dihantar sebagai gift</div>
+    <div class="rank-progress"><div class="rank-progress-fill" id="rankFill" style="width:0%"></div></div>
+    <div class="rank-next" id="rankNextTxt"></div>
+  </div>
+</div>
+
+<!-- WITHDRAW FORM -->
+<div class="section-title">💸 Withdraw Pendapatan</div>
+<div class="withdraw-card">
+  <div class="error-msg" id="errMsg"></div>
+
+  <div class="form-group">
+    <label>Jumlah Coins untuk Withdraw</label>
+    <div class="coins-slider-row">
+      <input type="number" id="wCoins" class="coins-input" placeholder="Min 1000 coins" min="1000" oninput="calcMYR()" />
+      <span class="coins-myr">= RM <span id="wMYR">0.00</span></span>
+    </div>
+    <div class="min-note">Minimum: 1,000 coins (RM 28) • Baki kau: 💎 <span id="avail">0</span></div>
+  </div>
+
+  <div class="form-group">
+    <label>Bank</label>
+    <select id="wBank">
+      <option value="">-- Pilih Bank --</option>
+      <option>Maybank</option>
+      <option>CIMB</option>
+      <option>Public Bank</option>
+      <option>RHB</option>
+      <option>Hong Leong Bank</option>
+      <option>AmBank</option>
+      <option>Bank Islam</option>
+      <option>Bank Rakyat</option>
+      <option>BSN</option>
+      <option>Touch 'n Go eWallet</option>
+      <option>GrabPay</option>
+      <option>Boost</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>No. Akaun / No. Telefon (eWallet)</label>
+    <input type="text" id="wAccount" placeholder="Contoh: 1234567890" />
+  </div>
+
+  <div class="form-group">
+    <label>Nama Pemegang Akaun</label>
+    <input type="text" id="wName" placeholder="Nama penuh seperti dalam MyKad" />
+  </div>
+
+  <button class="withdraw-btn" id="wBtn" onclick="submitWithdraw()" disabled>
+    Hantar Permintaan Withdraw
+  </button>
+</div>
+
+<!-- HISTORY TABS -->
+<div class="history-section">
+  <div class="section-title" style="padding:0;margin-bottom:12px">📋 Sejarah</div>
+  <div class="history-tabs">
+    <div class="htab active" id="ht_withdraw" onclick="switchHistory('withdraw')">💸 Withdraw</div>
+    <div class="htab" id="ht_topup" onclick="switchHistory('topup')">🪙 Top Up</div>
+    <div class="htab" id="ht_gifts" onclick="switchHistory('gifts')">🎁 Gifts</div>
+  </div>
+  <div id="historyList"><div class="spinner"></div></div>
+</div>
+
+<div class="modal-overlay" id="successModal">
+  <div class="modal-card">
+    <div class="modal-emoji">💸</div>
+    <div class="modal-title">Permintaan Dihantar!</div>
+    <div class="modal-sub">Withdraw kau sedang diproses. Biasanya dalam 1-3 hari bekerja.</div>
+    <button class="modal-btn" onclick="document.getElementById('successModal').classList.remove('show');loadHistory('withdraw')">OK</button>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+let myCoins = 0;
+const RATE = 0.028; // RM per coin after 30% fee (0.04 * 0.7)
+const MIN_WITHDRAW = 1000;
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+
+  // Load wallet
+  let { data: w } = await sb.from('user_coins').select('*').eq('user_id', currentUser.id).maybeSingle();
+  if (!w) {
+    const { data } = await sb.from('user_coins').insert({ user_id: currentUser.id, coins: 0, total_earned: 0, total_coins_spent: 0 }).select().single();
+    w = data;
+  }
+
+  myCoins = w?.coins || 0;
+  const earned = w?.total_earned || 0;
+  const spent = w?.total_coins_spent || 0;
+
+  document.getElementById('balCoins').textContent = formatCount(myCoins);
+  document.getElementById('balMYR').textContent = (myCoins * RATE).toFixed(2);
+  document.getElementById('statEarned').textContent = formatCount(earned);
+  document.getElementById('statSpent').textContent = formatCount(spent);
+  document.getElementById('avail').textContent = formatCount(myCoins);
+
+  // Total withdrawn
+  const { data: wr } = await sb.from('withdraw_requests')
+    .select('coins_amount').eq('user_id', currentUser.id).in('status', ['approved','paid']);
+  const totalW = wr?.reduce((s, r) => s + r.coins_amount, 0) || 0;
+  document.getElementById('statWithdrawn').textContent = formatCount(totalW);
+
+  // Rank
+  renderRank(spent);
+
+  // Enable withdraw button listener
+  document.getElementById('wCoins').addEventListener('input', checkWithdrawBtn);
+  document.getElementById('wBank').addEventListener('change', checkWithdrawBtn);
+  document.getElementById('wAccount').addEventListener('input', checkWithdrawBtn);
+  document.getElementById('wName').addEventListener('input', checkWithdrawBtn);
+
+  loadHistory('withdraw');
+  subscribeWithdrawStatus();
+}
+
+function renderRank(spent) {
+  const rank = getDiletRank(spent);
+  const nextRank = getNextRank(spent);
+  const pct = getRankProgress(spent);
+  document.getElementById('rankEmoji').textContent = rank.emoji;
+  document.getElementById('rankName').textContent = rank.name;
+  document.getElementById('rankName').style.color = rank.color;
+  document.getElementById('rankSpent').textContent = formatCount(spent);
+  const fill = document.getElementById('rankFill');
+  fill.style.width = pct + '%';
+  fill.style.background = `linear-gradient(90deg,${rank.color},${nextRank?.color || rank.color})`;
+  document.getElementById('rankNextTxt').textContent = nextRank
+    ? `💎 ${formatCount(nextRank.min - spent)} lagi untuk ${nextRank.name}`
+    : '🏆 Kau sudah mencapai rank tertinggi!';
+}
+
+function calcMYR() {
+  const coins = parseInt(document.getElementById('wCoins').value) || 0;
+  document.getElementById('wMYR').textContent = (coins * RATE).toFixed(2);
+  checkWithdrawBtn();
+}
+
+function checkWithdrawBtn() {
+  const coins = parseInt(document.getElementById('wCoins').value) || 0;
+  const bank = document.getElementById('wBank').value;
+  const acc = document.getElementById('wAccount').value.trim();
+  const name = document.getElementById('wName').value.trim();
+  const ok = coins >= MIN_WITHDRAW && coins <= myCoins && bank && acc && name;
+  document.getElementById('wBtn').disabled = !ok;
+  document.getElementById('wBtn').textContent = ok
+    ? `Withdraw 💎${coins.toLocaleString()} = RM ${(coins * RATE).toFixed(2)}`
+    : 'Hantar Permintaan Withdraw';
+}
+
+function showError(msg) {
+  const el = document.getElementById('errMsg');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+async function submitWithdraw() {
+  const coins = parseInt(document.getElementById('wCoins').value);
+  const bank = document.getElementById('wBank').value;
+  const account = document.getElementById('wAccount').value.trim();
+  const name = document.getElementById('wName').value.trim();
+
+  if (!coins || isNaN(coins)) return showError('Masukkan jumlah coins yang betul');
+  if (coins > myCoins) return showError(`Coins tidak mencukupi! Baki kau: 💎${myCoins.toLocaleString()}`);
+  if (coins < MIN_WITHDRAW) return showError(`Minimum withdraw adalah ${MIN_WITHDRAW} coins (RM ${(MIN_WITHDRAW*RATE).toFixed(2)})`);
+
+  const btn = document.getElementById('wBtn');
+  btn.disabled = true; btn.textContent = 'Memeriksa...';
+
+  // ✅ FIX 1: Check if there's already a pending withdraw
+  const { data: existing } = await sb.from('withdraw_requests')
+    .select('id')
+    .eq('user_id', currentUser.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (existing) {
+    showError('Kau sudah ada permintaan withdraw yang sedang diproses. Sila tunggu kelulusan admin.');
+    btn.disabled = false;
+    checkWithdrawBtn();
+    return;
+  }
+
+  btn.textContent = 'Menghantar...';
+
+  const { error } = await sb.from('withdraw_requests').insert({
+    user_id: currentUser.id,
+    coins_amount: coins,
+    amount_myr: parseFloat((coins * RATE).toFixed(2)),
+    bank_name: bank,
+    bank_account: account,
+    account_name: name,
+    status: 'pending'
+  });
+
+  if (error) {
+    showError('Gagal: ' + error.message);
+    btn.disabled = false;
+    checkWithdrawBtn();
+    return;
+  }
+
+  // ✅ FIX 2: Show success modal and reset form
+  document.getElementById('successModal').classList.add('show');
+
+  // Clear form
+  document.getElementById('wCoins').value = '';
+  document.getElementById('wBank').value = '';
+  document.getElementById('wAccount').value = '';
+  document.getElementById('wName').value = '';
+  document.getElementById('wMYR').textContent = '0.00';
+  btn.disabled = true;
+  btn.textContent = 'Hantar Permintaan Withdraw';
+
+  // ✅ FIX 3: Reload history to show new pending item
+  loadHistory('withdraw');
+}
+
+// ✅ FIX 4: Realtime listener — update UI when admin approves/rejects
+function subscribeWithdrawStatus() {
+  if (!currentUser) return;
+  sb.channel(`withdraw-status-${currentUser.id}`)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public',
+      table: 'withdraw_requests',
+      filter: `user_id=eq.${currentUser.id}`
+    }, async ({ new: r }) => {
+      if (r.status === 'approved' || r.status === 'paid') {
+        showError(''); // clear errors
+        // Reload wallet balance
+        const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', currentUser.id).maybeSingle();
+        if (w) {
+          myCoins = w.coins;
+          document.getElementById('balCoins').textContent = formatCount(myCoins);
+          document.getElementById('balMYR').textContent = (myCoins * RATE).toFixed(2);
+          document.getElementById('avail').textContent = formatCount(myCoins);
+        }
+        loadHistory('withdraw');
+      } else if (r.status === 'rejected') {
+        showError('❌ Withdraw ditolak: ' + (r.admin_note || 'Sila hubungi admin'));
+        loadHistory('withdraw');
+      }
+    })
+    .subscribe();
+}
+
+let histTab = 'withdraw';
+async function switchHistory(tab) {
+  histTab = tab;
+  document.querySelectorAll('.htab').forEach(el => el.classList.remove('active'));
+  document.getElementById('ht_' + tab).classList.add('active');
+  loadHistory(tab);
+}
+
+async function loadHistory(tab) {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="spinner"></div>';
+
+  if (tab === 'withdraw') {
+    const { data } = await sb.from('withdraw_requests').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20);
+    if (!data?.length) { list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada sejarah withdraw</div>'; return; }
+    list.innerHTML = data.map(r => `
+      <div class="history-item">
+        <div class="history-icon">💸</div>
+        <div class="history-info">
+          <div class="history-name">${r.bank_name} • ${r.bank_account}</div>
+          <div class="history-date">${timeAgo(r.created_at)}</div>
+        </div>
+        <div class="history-right">
+          <div class="history-amount red">-💎${r.coins_amount.toLocaleString()}</div>
+          <div class="history-amount green" style="font-size:12px">RM ${r.amount_myr}</div>
+          <span class="status-badge s-${r.status}">${r.status === 'pending' ? '⏳ Pending' : r.status === 'approved' ? '✅ Diluluskan' : r.status === 'paid' ? '✅ Dibayar' : '❌ Ditolak'}</span>
+        </div>
+      </div>`).join('');
+
+  } else if (tab === 'topup') {
+    const { data } = await sb.from('topup_requests').select('*, coin_packages(name)').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20);
+    if (!data?.length) { list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada sejarah top up</div>'; return; }
+    list.innerHTML = data.map(r => `
+      <div class="history-item">
+        <div class="history-icon">🪙</div>
+        <div class="history-info">
+          <div class="history-name">${r.coin_packages?.name || 'Top Up'}</div>
+          <div class="history-date">${timeAgo(r.created_at)}</div>
+        </div>
+        <div class="history-right">
+          <div class="history-amount gold">+💎${r.coins_amount.toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--muted)">RM ${r.price_myr}</div>
+          <span class="status-badge s-${r.status}">${r.status === 'pending' ? '⏳ Pending' : r.status === 'approved' ? '✅ Dikreditkan' : '❌ Ditolak'}</span>
+        </div>
+      </div>`).join('');
+
+  } else if (tab === 'gifts') {
+    const { data } = await sb.from('live_gifts')
+      .select('*, gift_types(name,emoji), sender:sender_id(username), receiver:receiver_id(username)')
+      .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+      .order('created_at', { ascending: false }).limit(30);
+    if (!data?.length) { list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada sejarah gift</div>'; return; }
+    list.innerHTML = data.map(g => {
+      const isSent = g.sender_id === currentUser.id;
+      return `
+        <div class="history-item">
+          <div class="history-icon">${g.gift_types?.emoji || '🎁'}</div>
+          <div class="history-info">
+            <div class="history-name">${g.gift_types?.name} ${isSent ? '→ @' + g.receiver?.username : '← @' + g.sender?.username}</div>
+            <div class="history-date">${timeAgo(g.created_at)}</div>
+          </div>
+          <div class="history-right">
+            <div class="history-amount ${isSent ? 'red' : 'green'}">${isSent ? '-' : '+'}💎${g.coin_amount}</div>
+            ${!isSent ? `<div style="font-size:11px;color:var(--muted)">70% = +${Math.floor(g.coin_amount*0.7)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

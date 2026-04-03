@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIBES — Trending</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+
+    /* Search bar */
+    .search-bar{display:flex;align-items:center;gap:10px;margin:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;transition:border-color 0.2s}
+    .search-bar:focus-within{border-color:var(--accent)}
+    .search-bar input{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;flex:1}
+    .search-bar input::placeholder{color:var(--muted)}
+
+    /* Trending tags */
+    .section{padding:0 16px;margin-bottom:24px}
+    .section-title{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+
+    .trending-list{}
+    .trending-item{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s}
+    .trending-item:hover{padding-left:4px}
+    .trend-rank{width:28px;font-size:16px;font-weight:900;color:var(--muted);text-align:center;flex-shrink:0}
+    .trend-rank.hot{color:var(--accent)}
+    .trend-info{flex:1}
+    .trend-tag{font-size:15px;font-weight:700}
+    .trend-count{font-size:12px;color:var(--muted);margin-top:2px}
+    .trend-arrow{font-size:14px;color:var(--muted);flex-shrink:0}
+    .trend-arrow.up{color:#22c55e}
+    .trend-arrow.down{color:var(--accent)}
+
+    /* Video grid for hashtag results */
+    .video-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+    .video-thumb{aspect-ratio:9/16;position:relative;cursor:pointer;overflow:hidden;background:var(--surface)}
+    .video-thumb video{width:100%;height:100%;object-fit:cover;transition:transform 0.2s}
+    .video-thumb:hover video{transform:scale(1.05)}
+    .thumb-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent)}
+    .thumb-stats{position:absolute;bottom:6px;left:8px;font-size:11px;font-weight:600}
+
+    /* Category pills */
+    .cat-scroll{display:flex;gap:8px;padding:0 16px 14px;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:16px}
+    .cat-scroll::-webkit-scrollbar{display:none}
+    .cat-pill{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--muted);transition:all 0.15s;flex-shrink:0}
+    .cat-pill.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    /* Tag result header */
+    .tag-header{padding:16px 16px 8px;display:flex;align-items:center;gap:10px}
+    .tag-name{font-size:20px;font-weight:800}
+    .tag-count{font-size:14px;color:var(--muted)}
+    .back-to-trending{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600}
+
+    .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:40px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Bottom nav */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;height:70px;background:rgba(0,0,0,0.97);display:flex;align-items:center;justify-content:space-around;border-top:1px solid var(--border)}
+    .bottom-tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-size:10px;font-weight:500;transition:color 0.2s;position:relative}
+    .bottom-tab.active{color:white}
+    .upload-tab{background:linear-gradient(135deg,var(--accent),var(--accent2));width:46px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:white}
+    .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="goBack()">←</button>
+  <span class="top-title" id="pageTitle">🔥 TRENDING</span>
+  <span style="width:32px"></span>
+</div>
+
+<div class="search-bar">
+  <span style="color:var(--muted);font-size:18px">#</span>
+  <input type="text" id="tagSearch" placeholder="Cari hashtag..." oninput="handleSearch(this.value)" />
+</div>
+
+<!-- Category pills -->
+<div class="cat-scroll">
+  <div class="cat-pill active" id="cat_all" onclick="setCategory('all', this)">🔥 Semua</div>
+  <div class="cat-pill" id="cat_funny" onclick="setCategory('funny', this)">😂 Lawak</div>
+  <div class="cat-pill" id="cat_food" onclick="setCategory('food', this)">🍜 Makanan</div>
+  <div class="cat-pill" id="cat_music" onclick="setCategory('music', this)">🎵 Muzik</div>
+  <div class="cat-pill" id="cat_dance" onclick="setCategory('dance', this)">💃 Tari</div>
+  <div class="cat-pill" id="cat_malaysia" onclick="setCategory('malaysia', this)">🇲🇾 Malaysia</div>
+  <div class="cat-pill" id="cat_gaming" onclick="setCategory('gaming', this)">🎮 Gaming</div>
+</div>
+
+<!-- Main content -->
+<div id="mainContent"><div class="spinner"></div></div>
+
+<!-- Tag videos view -->
+<div id="tagView" style="display:none">
+  <div class="tag-header">
+    <div>
+      <div class="tag-name" id="tagViewName">#tag</div>
+      <div class="tag-count" id="tagViewCount">0 videos</div>
+    </div>
+    <button class="back-to-trending" onclick="showTrending()">← Trending</button>
+  </div>
+  <div class="video-grid" id="tagVideoGrid"></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
+  <a class="bottom-tab active" href="trending.html">🔥<span>Trending</span></a>
+  <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
+  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
+</nav>
+
+<script>
+let currentCategory = 'all';
+let activeTag = null;
+
+const PRESET_TAGS = [
+  { tag: '#fyp', count: null, trend: 'up' },
+  { tag: '#viral', count: null, trend: 'up' },
+  { tag: '#malaysia', count: null, trend: 'up' },
+  { tag: '#trending', count: null, trend: 'up' },
+  { tag: '#funny', count: null, trend: 'stable' },
+  { tag: '#food', count: null, trend: 'up' },
+  { tag: '#dance', count: null, trend: 'down' },
+  { tag: '#music', count: null, trend: 'up' },
+  { tag: '#gaming', count: null, trend: 'stable' },
+  { tag: '#travel', count: null, trend: 'up' },
+  { tag: '#fashion', count: null, trend: 'up' },
+  { tag: '#sport', count: null, trend: 'stable' },
+  { tag: '#motivasi', count: null, trend: 'up' },
+  { tag: '#kucing', count: null, trend: 'up' },
+  { tag: '#masak', count: null, trend: 'stable' },
+];
+
+async function init() {
+  // Notif badge
+  const user = await getCurrentUser();
+  if (user) {
+    const { count } = await sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',user.id).eq('is_read',false);
+    if (count > 0) { const b = document.getElementById('notifBadge'); if(b){ b.textContent = count>99?'99+':count; b.style.display='block'; } }
+  }
+  loadTrending();
+}
+
+async function loadTrending() {
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('tagView').style.display = 'none';
+  document.getElementById('mainContent').innerHTML = '<div class="spinner"></div>';
+  document.getElementById('pageTitle').textContent = '🔥 TRENDING';
+
+  // Count videos per tag from DB
+  const tags = currentCategory === 'all' ? PRESET_TAGS : PRESET_TAGS.filter(t => t.tag.includes(currentCategory));
+
+  const counts = await Promise.all(tags.map(async t => {
+    const { count } = await sb.from('videos').select('*', { count: 'exact', head: true })
+      .ilike('description', `%${t.tag}%`).eq('is_public', true);
+    return { ...t, count: count || 0 };
+  }));
+
+  const sorted = counts.sort((a, b) => b.count - a.count);
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="section">
+      <div class="section-title">🔥 Trending Sekarang</div>
+      <div class="trending-list">
+        ${sorted.map((t, i) => `
+          <div class="trending-item" onclick="showTagVideos('${t.tag}')">
+            <div class="trend-rank ${i < 3 ? 'hot' : ''}">${i < 3 ? ['🔥','💥','⚡'][i] : (i + 1)}</div>
+            <div class="trend-info">
+              <div class="trend-tag">${t.tag}</div>
+              <div class="trend-count">${formatCount(t.count)} video${t.count !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="trend-arrow ${t.trend === 'up' ? 'up' : t.trend === 'down' ? 'down' : ''}">
+              ${t.trend === 'up' ? '↑' : t.trend === 'down' ? '↓' : '→'}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+async function showTagVideos(tag) {
+  activeTag = tag;
+  document.getElementById('pageTitle').textContent = tag.toUpperCase();
+  document.getElementById('tagViewName').textContent = tag;
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('tagView').style.display = 'block';
+  document.getElementById('tagVideoGrid').innerHTML = '<div class="spinner" style="grid-column:1/-1"></div>';
+
+  const { data: videos, count } = await sb.from('videos')
+    .select('id, video_url, likes_count, views_count, profiles(username)', { count: 'exact' })
+    .ilike('description', `%${tag}%`)
+    .eq('is_public', true)
+    .order('views_count', { ascending: false })
+    .limit(30);
+
+  document.getElementById('tagViewCount').textContent = formatCount(count || 0) + ' videos';
+
+  if (!videos?.length) {
+    document.getElementById('tagVideoGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted)">Tiada video dengan tag ini</div>';
+    return;
+  }
+
+  document.getElementById('tagVideoGrid').innerHTML = videos.map(v => `
+    <div class="video-thumb" onclick="window.location.href='video.html?id=${v.id}'">
+      <video src="${v.video_url}" muted preload="metadata"></video>
+      <div class="thumb-overlay"></div>
+      <div class="thumb-stats">👁 ${formatCount(v.views_count)}</div>
+    </div>`).join('');
+}
+
+function showTrending() {
+  activeTag = null;
+  loadTrending();
+}
+
+function setCategory(cat, el) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-pill').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  if (activeTag) showTagVideos(activeTag);
+  else loadTrending();
+}
+
+let searchTimer = null;
+function handleSearch(q) {
+  clearTimeout(searchTimer);
+  if (!q.trim()) { loadTrending(); return; }
+  searchTimer = setTimeout(() => showTagVideos('#' + q.replace('#', '')), 500);
+}
+
+function goBack() {
+  if (activeTag) { showTrending(); }
+  else { history.back(); }
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>
