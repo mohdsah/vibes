@@ -326,49 +326,64 @@ async function startCamera() {
 async function flipCamera() {
   if (!localStream) return;
 
-  // ✅ FIX: Stop VIDEO track dulu sebelum request kamera baru
-  // (sesetengah Android tak boleh 2 kamera aktif serentak)
+  // Disable flip button while flipping
+  const flipBtn = document.querySelector('[onclick="flipCamera()"] .action-icon');
+  if (flipBtn) flipBtn.style.opacity = '0.4';
+
+  // ✅ FIX: Stop VIDEO track dulu
   const oldVideoTracks = localStream.getVideoTracks();
   oldVideoTracks.forEach(t => t.stop());
 
-  // Switch facing mode
-  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  // ✅ FIX: Tunggu 400ms — Android perlu masa lepaskan hardware kamera
+  await new Promise(r => setTimeout(r, 400));
 
-  // Simpan audio tracks (jangan stop mic)
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
   const audioTracks = localStream.getAudioTracks();
 
   try {
-    // Request kamera baru sahaja (tanpa audio — guna semula audio lama)
     const newVideoStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 30 } },
-      audio: false  // ✅ jangan request audio baru
+      audio: false
     });
 
     const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
-    // Replace track dalam semua peer connections
+    // Replace track dalam peer connections
     for (const conn of Object.values(peerConnections)) {
       const sender = conn.pc.getSenders().find(s => s.track?.kind === 'video');
       if (sender && newVideoTrack) {
-        await sender.replaceTrack(newVideoTrack).catch(e => console.error('replaceTrack error:', e));
+        await sender.replaceTrack(newVideoTrack).catch(e => console.error('replaceTrack:', e));
       }
     }
 
-    // Bina stream baru: video baru + audio lama
+    // Gabung video baru + audio lama
     const combinedStream = new MediaStream([newVideoTrack, ...audioTracks]);
     localStream = combinedStream;
     document.getElementById('livePreview').srcObject = localStream;
-
-    // Apply mute state semula
     localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
 
     showToast(facingMode === 'environment' ? '📷 Kamera belakang' : '🤳 Kamera depan');
 
   } catch(e) {
-    // ✅ FIX: Kalau gagal, flip balik ke mode asal
+    // ✅ Revert facing mode kalau gagal
     facingMode = facingMode === 'user' ? 'environment' : 'user';
     showToast('❌ Gagal tukar kamera: ' + e.message, 3000);
-    console.error('Flip camera error:', e);
+
+    // Cuba recover — restart stream dengan kamera asal
+    try {
+      const recovery = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 } },
+        audio: false
+      });
+      const recovered = new MediaStream([recovery.getVideoTracks()[0], ...audioTracks]);
+      localStream = recovered;
+      document.getElementById('livePreview').srcObject = localStream;
+      showToast('🔄 Kamera dipulihkan', 2000);
+    } catch(e2) {
+      showToast('⚠️ Sila end live dan start semula', 4000);
+    }
+  } finally {
+    if (flipBtn) flipBtn.style.opacity = '1';
   }
 }
 

@@ -435,6 +435,7 @@ let sessionGifters = {};
 let reconnectAttempts = 0;
 const MAX_RECONNECT = 5;
 let reconnectTimer = null;
+let offerTimeoutTimer = null;
 
 const ICE_SERVERS = {
   iceServers: [
@@ -498,6 +499,16 @@ async function init() {
   }
 
   subscribeRealtime();
+
+  // ✅ FIX: Tunggu chatChannel SUBSCRIBED dulu sebelum connectToLive
+  // Ini elak race condition — viewer-join sent before channels ready
+  await new Promise(resolve => {
+    const check = setInterval(() => {
+      if (chatChannel) { clearInterval(check); resolve(); }
+    }, 50);
+    setTimeout(() => { clearInterval(check); resolve(); }, 2000); // max wait 2s
+  });
+
   await connectToLive();
   subscribeGifts();
   subscribeRoomStatus();
@@ -602,6 +613,7 @@ async function connectToLive() {
   sigChannel = sb.channel(`webrtc-sig-${roomId}`, { config: { broadcast: { self: false } } })
     .on('broadcast', { event: 'offer' }, async ({ payload }) => {
       if (payload.to !== myViewerId) return;
+      clearTimeout(offerTimeoutTimer); // got offer, cancel retry
       try {
         await localPc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.sdp }));
         hasRemoteDesc = true;
@@ -622,10 +634,27 @@ async function connectToLive() {
     .on('broadcast', { event: 'live-ended' }, () => showLiveEnded())
     .subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
+        // ✅ FIX: Send viewer-join on sigChannel
         await sigChannel.send({ type: 'broadcast', event: 'viewer-join', payload: { viewerId: myViewerId } });
-        // ✅ FIX: Notify via chat channel for viewer count
-        chatChannel?.send({ type: 'broadcast', event: 'viewer-joined', payload: { viewerId: myViewerId } });
+
+        // ✅ FIX: Also notify via chatChannel for viewer count
+        if (chatChannel) chatChannel.send({ type: 'broadcast', event: 'viewer-joined', payload: { viewerId: myViewerId } });
+
         if (currentUser) sb.from('live_rooms').update({ viewer_count: (viewerCount || 0) + 1 }).eq('id', roomId);
+
+        // ✅ FIX: If no offer in 5s, send viewer-join again (host might have missed it)
+        offerTimeoutTimer = setTimeout(async () => {
+          if (!hasRemoteDesc) {
+            document.getElementById('connectingText').textContent = 'Menghantar semula isyarat...';
+            await sigChannel.send({ type: 'broadcast', event: 'viewer-join', payload: { viewerId: myViewerId } });
+            // If still nothing after 10s total, show error
+            setTimeout(() => {
+              if (!hasRemoteDesc && !videoStarted) {
+                document.getElementById('connectingText').textContent = '⚠️ Host mungkin sedang ada masalah connection';
+              }
+            }, 5000);
+          }
+        }, 5000);
       }
     });
 }
@@ -1007,6 +1036,7 @@ function updateFollowBtn() {
 // ── LEAVE ─────────────────────────────────────
 async function leaveLive() {
   clearTimeout(reconnectTimer);
+  clearTimeout(offerTimeoutTimer);
   chatChannel?.send({ type: 'broadcast', event: 'viewer-left', payload: {} });
   if (currentUser) sb.from('live_rooms').update({ viewer_count: Math.max(0, viewerCount - 1) }).eq('id', roomId);
   if (localPc) { localPc.close(); localPc = null; }
