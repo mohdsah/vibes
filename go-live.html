@@ -324,21 +324,52 @@ async function startCamera() {
 }
 
 async function flipCamera() {
+  if (!localStream) return;
+
+  // ✅ FIX: Stop VIDEO track dulu sebelum request kamera baru
+  // (sesetengah Android tak boleh 2 kamera aktif serentak)
+  const oldVideoTracks = localStream.getVideoTracks();
+  oldVideoTracks.forEach(t => t.stop());
+
+  // Switch facing mode
   facingMode = facingMode === 'user' ? 'environment' : 'user';
+
+  // Simpan audio tracks (jangan stop mic)
+  const audioTracks = localStream.getAudioTracks();
+
   try {
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 } },
-      audio: { echoCancellation: true, noiseSuppression: true }
+    // Request kamera baru sahaja (tanpa audio — guna semula audio lama)
+    const newVideoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 30 } },
+      audio: false  // ✅ jangan request audio baru
     });
+
+    const newVideoTrack = newVideoStream.getVideoTracks()[0];
+
+    // Replace track dalam semua peer connections
     for (const conn of Object.values(peerConnections)) {
-      const vt = newStream.getVideoTracks()[0];
       const sender = conn.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender && vt) await sender.replaceTrack(vt);
+      if (sender && newVideoTrack) {
+        await sender.replaceTrack(newVideoTrack).catch(e => console.error('replaceTrack error:', e));
+      }
     }
-    if (localStream) localStream.getTracks().forEach(t => t.stop());
-    localStream = newStream;
+
+    // Bina stream baru: video baru + audio lama
+    const combinedStream = new MediaStream([newVideoTrack, ...audioTracks]);
+    localStream = combinedStream;
     document.getElementById('livePreview').srcObject = localStream;
-  } catch(e) { alert('Gagal flip: ' + e.message); }
+
+    // Apply mute state semula
+    localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+
+    showToast(facingMode === 'environment' ? '📷 Kamera belakang' : '🤳 Kamera depan');
+
+  } catch(e) {
+    // ✅ FIX: Kalau gagal, flip balik ke mode asal
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    showToast('❌ Gagal tukar kamera: ' + e.message, 3000);
+    console.error('Flip camera error:', e);
+  }
 }
 
 // ✅ NEW: Mute/Unmute mic
