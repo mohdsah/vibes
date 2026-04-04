@@ -80,6 +80,7 @@
     .reconnect-banner{position:absolute;top:70px;left:12px;right:12px;z-index:40;background:rgba(255,165,0,0.85);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;color:#000;display:none}
     .reconnect-banner.show{display:block;animation:fadeIn 0.3s ease}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
     /* ── CONNECTION STATUS ──────────────── */
     .conn-status{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(255,59,48,0.85);border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;display:none;z-index:30;white-space:nowrap}
@@ -250,7 +251,7 @@
   <div class="love-count" id="loveCount">❤️ 0</div>
 
   <!-- Tap to play overlay -->
-  <div class="tap-to-play" id="tapToPlay" onclick="startWatching()">
+  <div class="tap-to-play hidden" id="tapToPlay" onclick="startWatching()">
     <div class="tap-play-btn">▶</div>
     <div class="tap-play-text">Tap untuk mula tonton</div>
   </div>
@@ -548,21 +549,30 @@ async function connectToLive() {
 
   localPc.ontrack = (event) => {
     const video = document.getElementById('remoteVideo');
-    if (event.streams?.[0]) video.srcObject = event.streams[0];
-    else {
+    if (event.streams?.[0]) {
+      video.srcObject = event.streams[0];
+    } else {
       let stream = video.srcObject;
       if (!stream) { stream = new MediaStream(); video.srcObject = stream; }
       stream.addTrack(event.track);
     }
+
+    // ✅ FIX: Hide connecting, show tap-to-play (stream ready, waiting for user gesture)
+    document.getElementById('connectingOverlay').classList.add('hidden');
+
+    // Try autoplay muted first (most browsers allow this)
+    video.muted = true;
     video.play().then(() => {
       videoStarted = true;
-      document.getElementById('connectingOverlay').classList.add('hidden');
+      // Autoplay worked — hide tap overlay, show unmute hint
       document.getElementById('tapToPlay').classList.add('hidden');
       setConnStatus('🔴 Live terhubung!', true);
-      reconnectAttempts = 0; // reset on success
+      reconnectAttempts = 0;
       hidReconnectBanner();
+      // Show unmute toast after 1s
+      setTimeout(() => showToast('🔇 Tap 🔊 untuk unmute'), 1200);
     }).catch(() => {
-      document.getElementById('connectingOverlay').classList.add('hidden');
+      // Autoplay blocked — show tap to play
       document.getElementById('tapToPlay').classList.remove('hidden');
     });
   };
@@ -775,19 +785,64 @@ function showTargetComplete() {
 // ── TAP TO PLAY ──────────────────────────────
 function startWatching() {
   const video = document.getElementById('remoteVideo');
+
+  // ✅ FIX: If no stream yet, show connecting instead
+  if (!video.srcObject || video.srcObject.getTracks().length === 0) {
+    document.getElementById('tapToPlay').classList.add('hidden');
+    document.getElementById('connectingOverlay').classList.remove('hidden');
+    document.getElementById('connectingText').textContent = 'Menunggu stream dari host...';
+    // Retry after 3s
+    setTimeout(() => {
+      if (!videoStarted) {
+        document.getElementById('connectingOverlay').classList.add('hidden');
+        document.getElementById('tapToPlay').classList.remove('hidden');
+      }
+    }, 5000);
+    return;
+  }
+
+  // ✅ FIX: Try unmuted first (user gesture = browser allows)
   video.muted = false;
   video.play().then(() => {
     videoStarted = true;
     document.getElementById('tapToPlay').classList.add('hidden');
     setConnStatus('🔴 Live terhubung!', true);
   }).catch(() => {
+    // Unmuted failed — fallback muted
     video.muted = true;
     video.play().then(() => {
       videoStarted = true;
       document.getElementById('tapToPlay').classList.add('hidden');
-      showToast('🔇 Video muted. Tap 🔊 untuk unmute.');
+      showToast('🔇 Muted. Tap butang 🔊 untuk dengar suara');
+      // Add unmute button
+      showUnmuteBtn();
+    }).catch((err) => {
+      showToast('❌ Gagal main video: ' + err.message, 4000);
     });
   });
+}
+
+// ✅ NEW: Unmute button overlay
+function showUnmuteBtn() {
+  if (document.getElementById('unmuteBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'unmuteBtn';
+  btn.innerHTML = '🔇 Tap untuk dengar suara';
+  btn.style.cssText = `
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.8); border:1px solid rgba(255,255,255,0.3);
+    border-radius:24px; padding:10px 20px; color:white;
+    font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
+    cursor:pointer; z-index:50; white-space:nowrap;
+    animation:fadeIn 0.3s ease;
+  `;
+  btn.onclick = () => {
+    const video = document.getElementById('remoteVideo');
+    video.muted = false;
+    btn.remove();
+    showToast('🔊 Suara dihidupkan!');
+  };
+  document.getElementById('videoWrap').appendChild(btn);
 }
 
 // ── GIFT DRAWER ───────────────────────────────
