@@ -96,6 +96,19 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   UNIQUE(user_id, video_id)
 );
 
+-- VIDEO WATCH REWARDS — tonton video dapat coin
+CREATE TABLE IF NOT EXISTS video_watch_rewards (
+  id           UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id      UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  video_id     UUID REFERENCES videos(id)   ON DELETE CASCADE NOT NULL,
+  reward_date  DATE DEFAULT CURRENT_DATE,
+  coins_earned INT DEFAULT 1,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, video_id, reward_date)  -- 1 reward per video per hari
+);
+
+CREATE INDEX IF NOT EXISTS watch_rewards_user_date ON video_watch_rewards(user_id, reward_date);
+
 -- ================================================================
 -- 3. COMMENT LIKES (for liking individual comments / replies)
 -- ================================================================
@@ -390,6 +403,7 @@ ALTER TABLE comments          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comment_likes     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE follows           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookmarks         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE video_watch_rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_coins        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE coin_packages     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topup_requests    ENABLE ROW LEVEL SECURITY;
@@ -445,6 +459,10 @@ CREATE POLICY "follows_delete"    ON follows FOR DELETE USING (auth.uid()=follow
 CREATE POLICY "bookmarks_select"  ON bookmarks FOR SELECT USING (auth.uid()=user_id);
 CREATE POLICY "bookmarks_insert"  ON bookmarks FOR INSERT WITH CHECK (auth.uid()=user_id);
 CREATE POLICY "bookmarks_delete"  ON bookmarks FOR DELETE USING (auth.uid()=user_id);
+
+-- video_watch_rewards
+CREATE POLICY "rewards_select"    ON video_watch_rewards FOR SELECT USING (auth.uid()=user_id);
+CREATE POLICY "rewards_insert"    ON video_watch_rewards FOR INSERT WITH CHECK (auth.uid()=user_id);
 
 -- user_coins
 CREATE POLICY "coins_select"      ON user_coins FOR SELECT USING (auth.uid()=user_id);
@@ -893,6 +911,59 @@ CREATE TRIGGER on_dm_message AFTER INSERT ON dm_messages
 -- ================================================================
 -- HELPER FUNCTIONS
 -- ================================================================
+
+-- ── Watch reward: claim (atomic, anti-abuse) ─
+CREATE OR REPLACE FUNCTION claim_watch_reward(
+  p_user_id     UUID,
+  p_video_id    UUID,
+  p_coins       INT DEFAULT 1,
+  p_daily_limit INT DEFAULT 20
+)
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_owner       UUID;
+  v_today_count INT;
+  v_balance     INT;
+BEGIN
+  -- Owner video tak dapat reward
+  SELECT user_id INTO v_owner FROM videos WHERE id = p_video_id;
+  IF v_owner = p_user_id THEN
+    RETURN json_build_object('success',false,'message','owner');
+  END IF;
+
+  -- Semak had harian
+  SELECT COUNT(*) INTO v_today_count
+  FROM video_watch_rewards
+  WHERE user_id=p_user_id AND reward_date=CURRENT_DATE;
+
+  IF v_today_count >= p_daily_limit THEN
+    RETURN json_build_object('success',false,'message','limit','count',v_today_count);
+  END IF;
+
+  -- Insert reward (UNIQUE constraint prevent duplicate)
+  INSERT INTO video_watch_rewards(user_id,video_id,coins_earned)
+  VALUES(p_user_id,p_video_id,p_coins)
+  ON CONFLICT(user_id,video_id,reward_date) DO NOTHING;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('success',false,'message','already_earned');
+  END IF;
+
+  -- Tambah coin
+  INSERT INTO user_coins(user_id,coins,total_earned)
+  VALUES(p_user_id,p_coins,p_coins)
+  ON CONFLICT(user_id) DO UPDATE
+  SET coins=user_coins.coins+p_coins,
+      total_earned=user_coins.total_earned+p_coins,
+      updated_at=NOW();
+
+  SELECT coins INTO v_balance FROM user_coins WHERE user_id=p_user_id;
+
+  RETURN json_build_object(
+    'success',true,'coins',p_coins,'balance',v_balance,
+    'today',v_today_count+1,'message','earned'
+  );
+END;$$;
 
 -- Get or create DM conversation (called from frontend via RPC)
 CREATE OR REPLACE FUNCTION get_or_create_conversation(user_a UUID, user_b UUID)

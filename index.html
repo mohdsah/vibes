@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>VIBES — For You</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root { --bg:#000; --surface:#111; --border:#222; --accent:#ff2d55; --accent2:#ff6b35; --text:#fff; --muted:#888; --nav-h:60px; }
     html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); overflow: hidden; }
 
@@ -59,8 +59,34 @@
     .bottom-tab.active { color: white; }
     .upload-tab { background: linear-gradient(135deg, var(--accent), var(--accent2)); width: 46px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; box-shadow: 0 4px 15px rgba(255,45,85,0.4); }
     .notif-dot { position: absolute; top: -2px; right: -2px; background: var(--accent); color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; min-width: 16px; text-align: center; display: none; }
+    /* Live button pulse in nav */
+    #liveNavBtn { animation: liveBtnPulse 2.5s ease-in-out infinite; }
+    @keyframes liveBtnPulse { 0%,100%{ opacity:1 } 50%{ opacity:0.6 } }
 
-    /* Comment drawer */
+    /* ── WATCH EARN TOAST ────────────────── */
+    .earn-toast {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      z-index: 500; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .earn-bubble {
+      background: linear-gradient(135deg, rgba(255,215,0,0.95), rgba(255,149,0,0.95));
+      color: #000; font-weight: 800; font-size: 14px;
+      padding: 8px 18px; border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(255,215,0,0.5);
+      white-space: nowrap;
+      animation: earnPop 2.5s ease forwards;
+    }
+    @keyframes earnPop {
+      0%   { opacity: 0; transform: scale(0.6) translateY(8px); }
+      15%  { opacity: 1; transform: scale(1.1) translateY(0); }
+      30%  { transform: scale(1) translateY(0); }
+      75%  { opacity: 1; transform: translateY(-6px); }
+      100% { opacity: 0; transform: translateY(-20px); }
+    }
+    .earn-progress {
+      font-size: 10px; font-weight: 600; color: var(--gold);
+      background: rgba(0,0,0,0.7); border-radius: 10px; padding: 2px 10px;
+    }
     .drawer-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); display: none; }
     .drawer-overlay.open { display: block; }
     .comment-drawer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 201; background: #111; border-radius: 20px 20px 0 0; max-height: 70vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
@@ -77,7 +103,7 @@
     .comment-text { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.4; }
     .comment-time { font-size: 11px; color: var(--muted); margin-top: 4px; }
     .comment-input-row { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
-    .comment-input-row input { flex: 1; background: var(--border); border: none; border-radius: 24px; padding: 10px 16px; color: white; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
+    .comment-input-row input { flex: 1; background: var(--border); border: none; border-radius: 24px; padding: 10px 16px; color: white; font-family: 'DM Sans', sans-serif; font-size: 16px; outline: none; }
     .send-btn { background: var(--accent); border: none; border-radius: 50%; width: 38px; height: 38px; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
     .loader { height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--muted); }
@@ -99,12 +125,14 @@
 <nav class="top-nav">
   <span class="logo">VIBES</span>
   <div class="nav-tabs">
-    <!-- ✅ FIX: use switchFeed('following') not window.location -->
     <button class="nav-tab" id="tabFollowing" onclick="switchFeed('following')">Following</button>
     <button class="nav-tab active" id="tabForYou" onclick="switchFeed('foryou')">For You</button>
   </div>
-  <div class="nav-right">
+  <div class="nav-right" style="display:flex;align-items:center;gap:6px">
     <button class="btn-icon" onclick="window.location.href='search.html'">🔍</button>
+    <a class="btn-icon" href="notifications.html" style="text-decoration:none;position:relative">
+      🔔<span class="notif-dot" id="notifBadge" style="position:absolute;top:2px;right:2px"></span>
+    </a>
   </div>
 </nav>
 
@@ -116,10 +144,11 @@
   <a class="bottom-tab active" href="index.html">🏠<span>Home</span></a>
   <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
   <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
-  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="live-list.html" id="liveNavBtn">🔴<span>Live</span></a>
   <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
 </nav>
 
+<div class="earn-toast" id="earnToast" style="display:none"></div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeComments()"></div>
 <div class="comment-drawer" id="commentDrawer">
   <div class="drawer-header">
@@ -142,16 +171,39 @@ let page = 0;
 const PAGE_SIZE = 5;
 let loading = false;
 let hasMore = true;
-let currentFeed = 'foryou'; // ✅ track active tab
+let currentFeed = 'foryou';
+
+// ── WATCH-TO-EARN STATE ─────────────────────
+const WATCH_THRESHOLD_SEC = 10;   // tonton 10s = dapat coin
+const DAILY_LIMIT = 20;           // max 20 video/hari
+const COINS_PER_WATCH = 1;        // 1 coin per video
+
+let watchTimers = {};             // videoId → { startedAt, accumulated }
+let rewardedToday = new Set();    // video yang dah dapat hari ini (session cache)
+let todayEarnCount = 0;           // berapa video dah dapat hari ni
 
 async function init() {
   currentUser = await getCurrentUser();
   if (currentUser) {
     currentProfile = await getCurrentProfile();
     loadUnreadCount();
+    await loadTodayEarnCount();
   }
   await loadVideos();
   setupIntersectionObserver();
+}
+
+async function loadTodayEarnCount() {
+  if (!currentUser) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await sb.from('video_watch_rewards')
+    .select('video_id')
+    .eq('user_id', currentUser.id)
+    .eq('reward_date', today);
+  if (data) {
+    todayEarnCount = data.length;
+    data.forEach(r => rewardedToday.add(r.video_id));
+  }
 }
 
 async function loadUnreadCount() {
@@ -275,19 +327,124 @@ function createVideoItem(video, isLiked) {
 function setupIntersectionObserver() {
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      const vid = entry.target.querySelector('video');
+      const item = entry.target;
+      const vid = item.querySelector('video');
+      const videoId = item.dataset.videoId;
       if (!vid) return;
+
       if (entry.isIntersecting && entry.intersectionRatio > 0.7) {
+        // Play video
         vid.play().catch(() => {});
-      } else { vid.pause(); }
+
+        // ── Watch-to-earn: start timer ──
+        if (currentUser && videoId && !rewardedToday.has(videoId) && todayEarnCount < DAILY_LIMIT) {
+          if (!watchTimers[videoId]) watchTimers[videoId] = { accumulated: 0 };
+          watchTimers[videoId].startedAt = Date.now();
+
+          // Use timeupdate for accurate watch seconds
+          if (!vid._watchHandler) {
+            vid._watchHandler = () => trackWatchTime(videoId, vid);
+            vid.addEventListener('timeupdate', vid._watchHandler);
+          }
+        }
+      } else {
+        // Pause video
+        vid.pause();
+
+        // ── Stop accumulating watch time ──
+        if (videoId && watchTimers[videoId]?.startedAt) {
+          const elapsed = (Date.now() - watchTimers[videoId].startedAt) / 1000;
+          watchTimers[videoId].accumulated += elapsed;
+          watchTimers[videoId].startedAt = null;
+        }
+      }
     });
   }, { threshold: 0.7 });
 
   const feed = document.getElementById('feed');
   new MutationObserver(() => {
-    feed.querySelectorAll('.video-item').forEach(item => observer.observe(item));
+    feed.querySelectorAll('.video-item').forEach(item => {
+      if (!item._observed) { observer.observe(item); item._observed = true; }
+    });
   }).observe(feed, { childList: true });
   feed.querySelectorAll('.video-item').forEach(item => observer.observe(item));
+}
+
+// Track watch time using timeupdate — triggers ~4x/sec
+let lastTimeUpdate = {};
+function trackWatchTime(videoId, vid) {
+  if (rewardedToday.has(videoId)) return;
+  const now = Date.now();
+
+  // Count only actual playback seconds (not buffering)
+  if (lastTimeUpdate[videoId]) {
+    const delta = Math.min((now - lastTimeUpdate[videoId]) / 1000, 0.5);
+    if (!watchTimers[videoId]) watchTimers[videoId] = { accumulated: 0 };
+    watchTimers[videoId].accumulated += delta;
+
+    if (watchTimers[videoId].accumulated >= WATCH_THRESHOLD_SEC) {
+      earnWatchReward(videoId, vid);
+    }
+  }
+  lastTimeUpdate[videoId] = now;
+}
+
+async function earnWatchReward(videoId, vid) {
+  if (!currentUser || rewardedToday.has(videoId) || todayEarnCount >= DAILY_LIMIT) return;
+
+  // Optimistic — prevent double-earn
+  rewardedToday.add(videoId);
+
+  // Remove timeupdate listener
+  if (vid?._watchHandler) {
+    vid.removeEventListener('timeupdate', vid._watchHandler);
+    delete vid._watchHandler;
+  }
+
+  // Call Supabase RPC
+  const { data } = await sb.rpc('claim_watch_reward', {
+    p_user_id:     currentUser.id,
+    p_video_id:    videoId,
+    p_coins:       COINS_PER_WATCH,
+    p_daily_limit: DAILY_LIMIT
+  });
+
+  if (data?.success) {
+    todayEarnCount++;
+    showEarnToast(data.coins, data.today, data.balance);
+  } else if (data?.message === 'already_earned') {
+    // Already earned, just mark
+  } else if (data?.message === 'limit') {
+    showEarnToast(0, data.today, null, true);
+  }
+}
+
+function showEarnToast(coins, today, balance, isLimit = false) {
+  const el = document.getElementById('earnToast');
+  el.innerHTML = '';
+  el.style.display = 'flex';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'earn-bubble';
+
+  if (isLimit) {
+    bubble.textContent = `🎯 Had harian ${DAILY_LIMIT} video dicapai!`;
+    bubble.style.background = 'rgba(100,100,100,0.9)';
+    bubble.style.color = 'white';
+  } else {
+    bubble.textContent = `💎 +${coins} coin! Tonton dapat ganjaran`;
+  }
+  el.appendChild(bubble);
+
+  if (!isLimit && balance !== null) {
+    const sub = document.createElement('div');
+    sub.className = 'earn-progress';
+    sub.textContent = `${today}/${DAILY_LIMIT} video hari ini • Baki: 💎${formatCount(balance)}`;
+    el.appendChild(sub);
+  }
+
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 2800);
 }
 
 document.getElementById('feed').addEventListener('scroll', function() {

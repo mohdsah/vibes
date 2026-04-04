@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>VIBES Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{--bg:#050505;--surface:#0e0e0e;--surface2:#141414;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--text:#f0f0f0;--muted:#555;--gold:#ffd700;--green:#22c55e;--blue:#3b82f6}
     body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
@@ -88,10 +88,10 @@
     .reject-modal.show{display:flex}
     .reject-card{background:var(--surface);border-radius:16px;padding:24px;width:100%;max-width:380px}
     .reject-title{font-size:16px;font-weight:700;margin-bottom:14px}
-    textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;resize:none}
+    textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;resize:none}
     textarea:focus{border-color:var(--accent)}
     .reject-btns{display:flex;gap:8px;margin-top:14px}
-    .reject-btns button{flex:1;padding:11px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+    .reject-btns button{touch-action:manipulation;flex:1;padding:11px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
     .btn-cancel-r{background:var(--surface2);color:var(--muted)}
     .btn-confirm-r{background:var(--accent);color:white}
 
@@ -108,7 +108,7 @@
 
     /* User search */
     .search-bar{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;margin-bottom:16px;max-width:320px}
-    .search-bar input{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;flex:1}
+    .search-bar input{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;flex:1}
     .search-bar input::placeholder{color:var(--muted)}
   </style>
   <link rel="manifest" href="manifest.json"/>
@@ -128,6 +128,9 @@
   <div class="nav-item" id="nav_users" onclick="switchPage('users')"><span class="nav-icon">👥</span> Users</div>
   <div class="nav-item" id="nav_videos" onclick="switchPage('videos')"><span class="nav-icon">🎬</span> Videos</div>
   <div class="nav-item" id="nav_lives" onclick="switchPage('lives')"><span class="nav-icon">🔴</span> Live Rooms</div>
+  <div class="nav-item" id="nav_reports" onclick="switchPage('reports')"><span class="nav-icon">🚩</span> Reports <span class="nav-badge" id="reportBadge">0</span></div>
+  <div class="nav-item" id="nav_broadcast" onclick="switchPage('broadcast')"><span class="nav-icon">📢</span> Broadcast</div>
+  <div class="nav-item" id="nav_revenue" onclick="switchPage('revenue')"><span class="nav-icon">💰</span> Revenue</div>
   <div class="sidebar-bottom">
     <div id="adminInfo" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
     <button class="logout-btn" onclick="adminLogout()">Log Out</button>
@@ -233,10 +236,95 @@
 
   <!-- ── LIVES ──────────────────────────── -->
   <div class="page-section" id="sec_lives">
-    <div class="page-header"><div><div class="page-title">🔴 Live Rooms</div><div class="page-sub">Sejarah semua live stream</div></div></div>
+    <div class="page-header">
+      <div><div class="page-title">🔴 Live Rooms</div><div class="page-sub">Sejarah semua live stream</div></div>
+      <button class="btn-approve" onclick="forceEndAllLives()" style="padding:8px 16px">⛔ End All Lives</button>
+    </div>
     <div class="content">
       <div class="table-card">
         <div id="livesTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REPORTS ────────────────────────── -->
+  <div class="page-section" id="sec_reports">
+    <div class="page-header"><div><div class="page-title">🚩 Reports</div><div class="page-sub">Laporan dari pengguna</div></div></div>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn-view" id="rfilter_pending" onclick="setReportFilter('pending')" style="background:rgba(255,165,0,0.15);color:orange;border-color:orange">⏳ Pending</button>
+        <button class="btn-view" id="rfilter_reviewed" onclick="setReportFilter('reviewed')">✅ Reviewed</button>
+        <button class="btn-view" id="rfilter_all" onclick="setReportFilter('all')">📋 Semua</button>
+      </div>
+      <div class="table-card">
+        <div id="reportsTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BROADCAST ──────────────────────── -->
+  <div class="page-section" id="sec_broadcast">
+    <div class="page-header"><div><div class="page-title">📢 Broadcast</div><div class="page-sub">Hantar notifikasi ke semua pengguna</div></div></div>
+    <div class="content">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:560px">
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px">Jenis Notif</label>
+          <select id="bcType" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none">
+            <option value="announce">📣 Pengumuman</option>
+            <option value="promo">🎁 Promosi</option>
+            <option value="maintenance">🔧 Maintenance</option>
+            <option value="event">🎉 Event</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px">Mesej</label>
+          <textarea id="bcMsg" rows="4" placeholder="Tulis mesej broadcast..."></textarea>
+        </div>
+        <div style="margin-bottom:20px">
+          <label style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px">Sasaran</label>
+          <select id="bcTarget" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none">
+            <option value="all">👥 Semua pengguna</option>
+            <option value="active">✅ Pengguna aktif (ada video)</option>
+          </select>
+        </div>
+        <div style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:orange">
+          ⚠️ Broadcast akan masuk ke notification semua pengguna yang dipilih.
+        </div>
+        <button onclick="sendBroadcast()" class="btn-approve" style="width:100%;padding:14px;font-size:15px;border-radius:12px" id="bcBtn">📢 Hantar Broadcast</button>
+        <div id="bcResult" style="margin-top:12px;font-size:13px;text-align:center;color:var(--muted)"></div>
+      </div>
+
+      <!-- Broadcast history -->
+      <div style="margin-top:24px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">📋 Sejarah Broadcast</div>
+        <div class="table-card" id="broadcastHistory"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REVENUE ────────────────────────── -->
+  <div class="page-section" id="sec_revenue">
+    <div class="page-header"><div><div class="page-title">💰 Revenue</div><div class="page-sub">Analitik pendapatan platform</div></div></div>
+    <div class="content">
+      <div class="stats-grid" id="revenueStats" style="grid-template-columns:repeat(3,1fr)">
+        <div class="spinner" style="grid-column:1/-1"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+        <!-- Top spenders -->
+        <div class="table-card">
+          <div class="table-header"><span class="table-title">💎 Top Spenders</span></div>
+          <div id="topSpenders"><div class="spinner"></div></div>
+        </div>
+        <!-- Top earners -->
+        <div class="table-card">
+          <div class="table-header"><span class="table-title">🏆 Top Earners</span></div>
+          <div id="topEarners"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <!-- Recent transactions -->
+      <div class="table-card">
+        <div class="table-header"><span class="table-title">📊 Transaksi Terkini</span></div>
+        <div id="recentTransactions"><div class="spinner"></div></div>
       </div>
     </div>
   </div>
@@ -292,6 +380,9 @@ function switchPage(page) {
   else if (page === 'users') loadUsers();
   else if (page === 'videos') loadVideos();
   else if (page === 'lives') loadLives();
+  else if (page === 'reports') loadReports();
+  else if (page === 'broadcast') { loadBroadcastHistory(); }
+  else if (page === 'revenue') loadRevenue();
   else if (page === 'dashboard') loadDashboard();
 }
 
@@ -474,10 +565,14 @@ function renderUsers(users) {
         <td><div class="user-cell"><img src="${getAvatarUrl(u)}" /><div><div class="user-cell-name">${u.display_name||'—'}</div><div class="user-cell-handle">@${u.username}</div></div></div></td>
         <td>${formatCount(u.followers_count)}</td>
         <td>${formatCount(u.videos_count)}</td>
-        <td>💎 ${formatCount(u.user_coins?.[0]?.coins||0)}</td>
+        <td style="color:var(--gold)">💎 ${formatCount(u.user_coins?.[0]?.coins||0)}</td>
         <td style="color:var(--green)">💎 ${formatCount(u.user_coins?.[0]?.total_earned||0)}</td>
-        <td style="font-size:12px">${timeAgo(u.created_at)}</td>
-        <td><a href="profile.html?id=${u.id}" target="_blank" class="btn-view">Lihat</a></td>
+        <td style="font-size:12px;color:var(--muted)">${timeAgo(u.created_at)}</td>
+        <td><div class="action-btns">
+          <a href="profile.html?id=${u.id}" target="_blank" class="btn-view">👤</a>
+          <button class="btn-approve" onclick="giveCoins('${u.id}','${u.username}')">💎 Bagi</button>
+          <button class="btn-reject" onclick="banUser('${u.id}','${u.username}')">🚫 Ban</button>
+        </div></td>
       </tr>`).join('')}
     </tbody></table>`;
 }
@@ -541,6 +636,247 @@ function showToastAdmin(msg) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2500);
+}
+
+// ── FORCE END ALL LIVES ──────────────────────
+async function forceEndAllLives() {
+  if (!confirm('End SEMUA live stream aktif sekarang?')) return;
+  const { data, error } = await sb.from('live_rooms')
+    .update({ status: 'ended', ended_at: new Date().toISOString(), viewer_count: 0 })
+    .eq('status', 'live');
+  if (error) { showToastAdmin('❌ Error: ' + error.message); return; }
+  showToastAdmin('⛔ Semua live telah ditamatkan!');
+  loadLives();
+}
+
+// ── BAN USER ─────────────────────────────────
+async function banUser(userId, username) {
+  const reason = prompt(`Ban @${username}?\nSebab (optional):`);
+  if (reason === null) return; // cancelled
+  // Delete all their videos, set a banned flag
+  if (!confirm(`Confirm ban @${username}? Semua video akan disembunyikan.`)) return;
+  // Hide all videos
+  await sb.from('videos').update({ is_public: false }).eq('user_id', userId);
+  // Add to a note (we store in admin_users or notifications)
+  await sb.from('notifications').insert({
+    user_id: userId, type: 'follow',
+    message: `🚫 Akaun kau telah disekat oleh admin. Sebab: ${reason || 'Melanggar terma perkhidmatan.'}`,
+    entity_type: 'ban'
+  });
+  showToastAdmin(`🚫 @${username} telah di-ban!`);
+  loadUsers();
+}
+
+async function unbanUser(userId, username) {
+  if (!confirm(`Unban @${username}? Semua video akan kembali visible.`)) return;
+  await sb.from('videos').update({ is_public: true }).eq('user_id', userId);
+  showToastAdmin(`✅ @${username} telah di-unban!`);
+  loadUsers();
+}
+
+// ── GIVE COINS TO USER ────────────────────────
+async function giveCoins(userId, username) {
+  const amount = parseInt(prompt(`Bagi coins kepada @${username}?\nJumlah coins:`));
+  if (!amount || isNaN(amount) || amount <= 0) return;
+  const { error } = await sb.from('user_coins')
+    .upsert({ user_id: userId, coins: 0 }, { onConflict: 'user_id' });
+  await sb.from('user_coins')
+    .update({ coins: sb.rpc('raw', `coins + ${amount}`) })
+    .eq('user_id', userId);
+  // Simpler approach: read then update
+  const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', userId).maybeSingle();
+  await sb.from('user_coins').update({ coins: (w?.coins || 0) + amount, total_earned: (w?.total_earned || 0) + amount }).eq('user_id', userId);
+  await sb.from('notifications').insert({ user_id: userId, type: 'topup_approved', message: `🎁 Admin memberi kau 💎${amount} coins!`, entity_type: 'admin_gift' });
+  showToastAdmin(`💎 ${amount} coins diberikan kepada @${username}!`);
+}
+
+// ── REPORTS ──────────────────────────────────
+let reportFilter = 'pending';
+
+function setReportFilter(filter) {
+  reportFilter = filter;
+  document.querySelectorAll('[id^="rfilter_"]').forEach(el => {
+    el.style.background = ''; el.style.color = ''; el.style.borderColor = '';
+  });
+  const active = document.getElementById('rfilter_' + filter);
+  if (active) { active.style.background = 'rgba(255,45,85,0.15)'; active.style.color = 'var(--accent)'; active.style.borderColor = 'var(--accent)'; }
+  loadReports();
+}
+
+async function loadReports() {
+  document.getElementById('reportsTable').innerHTML = '<div class="spinner"></div>';
+  let query = sb.from('reports')
+    .select('*, reporter:reporter_id(username, display_name, avatar_url), reported_user:reported_user_id(username, display_name), reported_video:reported_video_id(title, video_url)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (reportFilter !== 'all') query = query.eq('status', reportFilter);
+  const { data } = await query;
+
+  const el = document.getElementById('reportsTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted)">Tiada report</div>'; return; }
+
+  el.innerHTML = `<table>
+    <thead><tr><th>Reporter</th><th>Jenis</th><th>Sebab</th><th>Tarikh</th><th>Status</th><th>Tindakan</th></tr></thead>
+    <tbody>
+      ${data.map(r => `
+        <tr>
+          <td><div class="user-cell">
+            <img src="${getAvatarUrl(r.reporter)}" /><div class="user-cell-info">
+              <div class="user-cell-name">@${r.reporter?.username}</div>
+              <div class="user-cell-handle">${r.reported_user ? 'User: @'+r.reported_user.username : r.reported_video ? 'Video: '+( r.reported_video.title||'—') : '—'}</div>
+            </div></div></td>
+          <td>${r.reported_video_id ? '🎬 Video' : '👤 User'}</td>
+          <td><span class="badge badge-pending" style="text-transform:capitalize">${r.reason}</span></td>
+          <td style="color:var(--muted);font-size:12px">${timeAgo(r.created_at)}</td>
+          <td><span class="badge badge-${r.status === 'pending' ? 'pending' : r.status === 'reviewed' ? 'approved' : 'rejected'}">${r.status}</span></td>
+          <td><div class="action-btns">
+            ${r.status === 'pending' ? `
+              <button class="btn-approve" onclick="actionReport('${r.id}','reviewed')">✅ Review</button>
+              <button class="btn-reject" onclick="actionReport('${r.id}','actioned')">⚡ Aksi</button>
+            ` : '—'}
+            ${r.reported_user_id ? `<button class="btn-view" onclick="banUser('${r.reported_user_id}','${r.reported_user?.username}')">🚫 Ban</button>` : ''}
+            ${r.reported_video_id ? `<button class="btn-reject" onclick="deleteReportedVideo('${r.reported_video_id}','${r.id}')">🗑️ Padam</button>` : ''}
+          </div></td>
+        </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function actionReport(reportId, status) {
+  await sb.from('reports').update({ status }).eq('id', reportId);
+  showToastAdmin(status === 'actioned' ? '⚡ Tindakan diambil!' : '✅ Report ditandakan reviewed');
+  loadReports();
+  loadBadges();
+}
+
+async function deleteReportedVideo(videoId, reportId) {
+  if (!confirm('Padam video ini?')) return;
+  await sb.from('videos').delete().eq('id', videoId);
+  await sb.from('reports').update({ status: 'actioned' }).eq('id', reportId);
+  showToastAdmin('🗑️ Video dipadam, report actioned');
+  loadReports();
+}
+
+// ── BROADCAST ────────────────────────────────
+async function sendBroadcast() {
+  const msg = document.getElementById('bcMsg').value.trim();
+  const type = document.getElementById('bcType').value;
+  const target = document.getElementById('bcTarget').value;
+  if (!msg) { showToastAdmin('❌ Tulis mesej dulu!'); return; }
+
+  const btn = document.getElementById('bcBtn');
+  btn.disabled = true; btn.textContent = 'Menghantar...';
+
+  // Get target user IDs
+  let userIds = [];
+  if (target === 'all') {
+    const { data } = await sb.from('profiles').select('id');
+    userIds = data?.map(p => p.id) || [];
+  } else {
+    const { data } = await sb.from('videos').select('user_id').limit(1000);
+    userIds = [...new Set(data?.map(v => v.user_id) || [])];
+  }
+
+  const icons = { announce: '📣', promo: '🎁', maintenance: '🔧', event: '🎉' };
+  const notifs = userIds.map(uid => ({
+    user_id: uid,
+    type: 'follow', // reuse follow type for notifications
+    message: `${icons[type] || '📢'} ${msg}`,
+    entity_type: 'broadcast'
+  }));
+
+  // Insert in batches of 100
+  let sent = 0;
+  for (let i = 0; i < notifs.length; i += 100) {
+    const batch = notifs.slice(i, i + 100);
+    const { error } = await sb.from('notifications').insert(batch);
+    if (!error) sent += batch.length;
+  }
+
+  document.getElementById('bcResult').textContent = `✅ Dihantar ke ${sent} pengguna`;
+  document.getElementById('bcMsg').value = '';
+  btn.disabled = false; btn.textContent = '📢 Hantar Broadcast';
+  showToastAdmin(`📢 Broadcast dihantar ke ${sent} pengguna!`);
+  loadBroadcastHistory();
+}
+
+async function loadBroadcastHistory() {
+  const el = document.getElementById('broadcastHistory');
+  if (!el) return;
+  const { data } = await sb.from('notifications')
+    .select('message, created_at')
+    .eq('entity_type', 'broadcast')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Tiada sejarah broadcast</div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>Mesej</th><th>Masa</th></tr></thead><tbody>
+    ${data.map(n => `<tr><td>${n.message}</td><td style="color:var(--muted);font-size:12px;white-space:nowrap">${timeAgo(n.created_at)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── REVENUE ───────────────────────────────────
+async function loadRevenue() {
+  document.getElementById('revenueStats').innerHTML = '<div class="spinner" style="grid-column:1/-1"></div>';
+
+  const [
+    { data: topups },
+    { data: withdraws },
+    { data: gifts },
+    { data: spenders },
+    { data: earners }
+  ] = await Promise.all([
+    sb.from('topup_requests').select('price_myr, coins_amount, created_at').eq('status', 'approved'),
+    sb.from('withdraw_requests').select('amount_myr, coins_amount').in('status', ['approved','paid']),
+    sb.from('live_gifts').select('coin_amount, created_at'),
+    sb.from('user_coins').select('user_id, total_coins_spent, profiles(username, display_name, avatar_url)').order('total_coins_spent', { ascending: false }).limit(10),
+    sb.from('user_coins').select('user_id, total_earned, profiles(username, display_name, avatar_url)').order('total_earned', { ascending: false }).limit(10),
+  ]);
+
+  const totalRevMYR = topups?.reduce((s, r) => s + parseFloat(r.price_myr || 0), 0) || 0;
+  const totalPaidMYR = withdraws?.reduce((s, r) => s + parseFloat(r.amount_myr || 0), 0) || 0;
+  const totalGiftCoins = gifts?.reduce((s, g) => s + (g.coin_amount || 0), 0) || 0;
+  const platformFee = totalGiftCoins * 0.3; // 30% platform fee from gifts
+
+  document.getElementById('revenueStats').innerHTML = `
+    <div class="stat-card green"><div class="stat-card-icon">💵</div><div class="stat-card-num">RM ${totalRevMYR.toFixed(2)}</div><div class="stat-card-label">Total Top Up (Lulus)</div></div>
+    <div class="stat-card accent"><div class="stat-card-icon">💸</div><div class="stat-card-num">RM ${totalPaidMYR.toFixed(2)}</div><div class="stat-card-label">Total Withdraw (Bayar)</div></div>
+    <div class="stat-card gold"><div class="stat-card-icon">💎</div><div class="stat-card-num">${formatCount(Math.floor(platformFee))}</div><div class="stat-card-label">Platform Fee (30% Gift)</div></div>`;
+
+  // Top spenders
+  const spEl = document.getElementById('topSpenders');
+  spEl.innerHTML = (spenders || []).slice(0, 8).map((u, i) => `
+    <div class="user-cell" style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <div style="width:22px;text-align:center;font-size:14px;font-weight:800;color:var(--muted)">${i+1}</div>
+      <img src="${getAvatarUrl(u.profiles)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">@${u.profiles?.username}</div></div>
+      <div style="color:var(--accent);font-weight:800;font-size:13px">💎${formatCount(u.total_coins_spent)}</div>
+    </div>`).join('');
+
+  // Top earners
+  const eEl = document.getElementById('topEarners');
+  eEl.innerHTML = (earners || []).slice(0, 8).map((u, i) => `
+    <div class="user-cell" style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <div style="width:22px;text-align:center;font-size:14px;font-weight:800;color:var(--muted)">${i+1}</div>
+      <img src="${getAvatarUrl(u.profiles)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">@${u.profiles?.username}</div></div>
+      <div style="color:var(--green);font-weight:800;font-size:13px">💎${formatCount(u.total_earned)}</div>
+    </div>`).join('');
+
+  // Recent topups
+  const { data: recent } = await sb.from('topup_requests')
+    .select('*, profiles(username)').eq('status', 'approved')
+    .order('processed_at', { ascending: false }).limit(15);
+
+  document.getElementById('recentTransactions').innerHTML = `<table>
+    <thead><tr><th>User</th><th>Coins</th><th>RM</th><th>Masa</th></tr></thead>
+    <tbody>${(recent||[]).map(r => `<tr>
+      <td>@${r.profiles?.username}</td>
+      <td style="color:var(--gold)">💎${r.coins_amount.toLocaleString()}</td>
+      <td style="color:var(--green)">RM ${r.price_myr}</td>
+      <td style="color:var(--muted);font-size:12px">${timeAgo(r.created_at)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
 }
 
 function adminLogout() { sb.auth.signOut().then(() => window.location.href = 'auth.html'); }

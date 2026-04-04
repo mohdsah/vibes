@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>VIBES — Discover</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
       --bg: #0a0a0a; --surface: #111; --border: #1e1e1e;
       --accent: #ff2d55; --accent2: #ff6b35;
@@ -38,7 +38,7 @@
     .search-input {
       flex: 1; background: none; border: none;
       color: var(--text); font-family: 'DM Sans', sans-serif;
-      font-size: 15px; outline: none;
+      font-size: 16px; outline: none;
     }
     .search-input::placeholder { color: var(--muted); }
 
@@ -108,7 +108,7 @@
     /* Bottom nav */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-      height: 70px; background: rgba(0,0,0,0.95);
+      height: calc(70px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); background: rgba(0,0,0,0.95);
       display: flex; align-items: center; justify-content: space-around;
       border-top: 1px solid var(--border);
     }
@@ -174,7 +174,7 @@
   <a class="bottom-tab" href="index.html">🏠<span>Home</span></a>
   <a class="bottom-tab active" href="search.html">🔍<span>Discover</span></a>
   <a class="bottom-tab" href="upload.html"><div class="upload-tab">＋</div></a>
-  <a class="bottom-tab" href="notifications.html">🔔<span>Notif</span><span class="notif-dot" id="notifBadge"></span></a>
+  <a class="bottom-tab" href="live-list.html" id="liveNavBtn">🔴<span>Live</span></a>
   <a class="bottom-tab" href="profile.html">👤<span>Profile</span></a>
 </nav>
 
