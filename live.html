@@ -439,9 +439,12 @@ let offerTimeoutTimer = null;
 
 const ICE_SERVERS = {
   iceServers: [
+    // ✅ FIX: TURN servers untuk mobile 4G/NAT strict
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   ]
 };
 
@@ -498,17 +501,11 @@ async function init() {
     isFollowing = !!f; isSubscribed = !!s;
   }
 
-  subscribeRealtime();
+  // ✅ FIX: subscribeRealtime returns Promise — resolve bila chatChannel SUBSCRIBED
+  await subscribeRealtime();
+  initTapLove();
 
-  // ✅ FIX: Tunggu chatChannel SUBSCRIBED dulu sebelum connectToLive
-  // Ini elak race condition — viewer-join sent before channels ready
-  await new Promise(resolve => {
-    const check = setInterval(() => {
-      if (chatChannel) { clearInterval(check); resolve(); }
-    }, 50);
-    setTimeout(() => { clearInterval(check); resolve(); }, 2000); // max wait 2s
-  });
-
+  // Terus connect — sigChannel akan handle viewer-join dalam connectToLive
   await connectToLive();
   subscribeGifts();
   subscribeRoomStatus();
@@ -552,11 +549,21 @@ function updateTargetUI() {
 
 // ── WEBRTC ────────────────────────────────────
 async function connectToLive() {
+  // Close old PC
   if (localPc) { try { localPc.close(); } catch(e) {} localPc = null; }
   iceCandidateBuffer = [];
   hasRemoteDesc = false;
+  clearTimeout(offerTimeoutTimer);
+
+  document.getElementById('connectingOverlay').classList.remove('hidden');
+  document.getElementById('tapToPlay').classList.add('hidden');
+  document.getElementById('connectingText').textContent = 'Menyambung ke live...';
 
   localPc = new RTCPeerConnection(ICE_SERVERS);
+
+  // ✅ Add transceiver to receive video+audio (required for offer to work)
+  localPc.addTransceiver('video', { direction: 'recvonly' });
+  localPc.addTransceiver('audio', { direction: 'recvonly' });
 
   localPc.ontrack = (event) => {
     const video = document.getElementById('remoteVideo');
@@ -568,52 +575,56 @@ async function connectToLive() {
       stream.addTrack(event.track);
     }
 
-    // ✅ FIX: Hide connecting, show tap-to-play (stream ready, waiting for user gesture)
     document.getElementById('connectingOverlay').classList.add('hidden');
-
-    // Try autoplay muted first (most browsers allow this)
     video.muted = true;
     video.play().then(() => {
       videoStarted = true;
-      // Autoplay worked — hide tap overlay, show unmute hint
       document.getElementById('tapToPlay').classList.add('hidden');
       setConnStatus('🔴 Live terhubung!', true);
       reconnectAttempts = 0;
       hidReconnectBanner();
-      // Show unmute toast after 1s
       setTimeout(() => showToast('🔇 Tap 🔊 untuk unmute'), 1200);
     }).catch(() => {
-      // Autoplay blocked — show tap to play
       document.getElementById('tapToPlay').classList.remove('hidden');
     });
   };
 
   localPc.onicecandidate = ({ candidate }) => {
-    if (candidate) sigChannel?.send({ type: 'broadcast', event: 'ice-from-viewer', payload: { from: myViewerId, candidate: candidate.toJSON() } });
+    if (candidate) sigChannel?.send({
+      type: 'broadcast', event: 'ice-from-viewer',
+      payload: { from: myViewerId, candidate: candidate.toJSON() }
+    });
   };
 
   localPc.onconnectionstatechange = () => {
-    console.log('Connection state:', localPc.connectionState);
-    if (localPc.connectionState === 'connected') {
+    const s = localPc?.connectionState;
+    if (s === 'connected') {
       setConnStatus('🟢 Berjaya!', true);
       reconnectAttempts = 0;
       hidReconnectBanner();
-    } else if (localPc.connectionState === 'failed') {
+    } else if (s === 'failed') {
       setConnStatus('❌ Sambungan gagal');
-      // ✅ FIX: Auto reconnect
       scheduleReconnect();
-    } else if (localPc.connectionState === 'disconnected') {
+    } else if (s === 'disconnected') {
       setConnStatus('⚠️ Sambungan terputus...');
       scheduleReconnect();
     }
   };
 
-  // Signaling channel
-  if (sigChannel) { try { sb.removeChannel(sigChannel); } catch(e) {} }
+  localPc.oniceconnectionstatechange = () => {
+    // ✅ ICE restart jika failed
+    if (localPc?.iceConnectionState === 'failed') {
+      try { localPc.restartIce(); } catch(e) { scheduleReconnect(); }
+    }
+  };
+
+  // Remove old sigChannel
+  if (sigChannel) { try { sb.removeChannel(sigChannel); } catch(e) {} sigChannel = null; }
+
   sigChannel = sb.channel(`webrtc-sig-${roomId}`, { config: { broadcast: { self: false } } })
     .on('broadcast', { event: 'offer' }, async ({ payload }) => {
       if (payload.to !== myViewerId) return;
-      clearTimeout(offerTimeoutTimer); // got offer, cancel retry
+      clearTimeout(offerTimeoutTimer);
       try {
         await localPc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.sdp }));
         hasRemoteDesc = true;
@@ -627,34 +638,34 @@ async function connectToLive() {
     .on('broadcast', { event: 'ice-from-host' }, async ({ payload }) => {
       if (payload.to !== myViewerId || !payload.candidate) return;
       try {
-        if (hasRemoteDesc && localPc.remoteDescription) await localPc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        else iceCandidateBuffer.push(payload.candidate);
+        if (hasRemoteDesc && localPc?.remoteDescription) {
+          await localPc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } else {
+          iceCandidateBuffer.push(payload.candidate);
+        }
       } catch(e) {}
     })
     .on('broadcast', { event: 'live-ended' }, () => showLiveEnded())
     .subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        // ✅ FIX: Send viewer-join on sigChannel
+        // ✅ Send viewer-join AFTER sigChannel is ready
         await sigChannel.send({ type: 'broadcast', event: 'viewer-join', payload: { viewerId: myViewerId } });
-
-        // ✅ FIX: Also notify via chatChannel for viewer count
         if (chatChannel) chatChannel.send({ type: 'broadcast', event: 'viewer-joined', payload: { viewerId: myViewerId } });
-
         if (currentUser) sb.from('live_rooms').update({ viewer_count: (viewerCount || 0) + 1 }).eq('id', roomId);
 
-        // ✅ FIX: If no offer in 5s, send viewer-join again (host might have missed it)
+        // ✅ Retry if no offer in 6s (host might have missed the join)
         offerTimeoutTimer = setTimeout(async () => {
           if (!hasRemoteDesc) {
             document.getElementById('connectingText').textContent = 'Menghantar semula isyarat...';
             await sigChannel.send({ type: 'broadcast', event: 'viewer-join', payload: { viewerId: myViewerId } });
-            // If still nothing after 10s total, show error
+            // Still nothing after 12s → show warning
             setTimeout(() => {
               if (!hasRemoteDesc && !videoStarted) {
-                document.getElementById('connectingText').textContent = '⚠️ Host mungkin sedang ada masalah connection';
+                document.getElementById('connectingText').textContent = '⚠️ Host mungkin ada masalah. Cuba refresh.';
               }
-            }, 5000);
+            }, 6000);
           }
-        }, 5000);
+        }, 6000);
       }
     });
 }
@@ -685,37 +696,41 @@ function hidReconnectBanner() {
   document.getElementById('reconnectBanner').classList.remove('show');
 }
 
-// ── CHAT ─────────────────────────────────────
+// ✅ FIX: Returns Promise — resolve when chatChannel is SUBSCRIBED
 function subscribeRealtime() {
-  chatChannel = sb.channel(`live-chat-${roomId}`)
-    .on('broadcast', { event: 'message' }, ({ payload }) => {
-      addChatMsg(payload.username, payload.text, false, payload.isSystem);
-    })
-    // ✅ Viewer count via broadcast
-    .on('broadcast', { event: 'viewer-joined' }, () => {
-      viewerCount++;
-      document.getElementById('viewerCount').textContent = viewerCount;
-    })
-    .on('broadcast', { event: 'viewer-left' }, () => {
-      viewerCount = Math.max(0, viewerCount - 1);
-      document.getElementById('viewerCount').textContent = viewerCount;
-    })
-    // ✅ Love taps from other viewers — same TikTok style
-    .on('broadcast', { event: 'love-tap' }, ({ payload }) => {
-      if (!payload?.count) return;
-      for (let i = 0; i < Math.min(payload.count, 3); i++) {
-        setTimeout(() => {
-          const x = 30 + Math.random() * (window.innerWidth - 60);
-          const y = window.innerHeight - 160 - Math.random() * 80;
-          spawnHearts(x, y);
-        }, i * 120);
-      }
-      loveTotal += payload.count;
-      showLoveCount();
-    })
-    .subscribe();
+  return new Promise(resolve => {
+    chatChannel = sb.channel(`live-chat-${roomId}`)
+      .on('broadcast', { event: 'message' }, ({ payload }) => {
+        addChatMsg(payload.username, payload.text, false, payload.isSystem);
+      })
+      .on('broadcast', { event: 'viewer-joined' }, () => {
+        viewerCount++;
+        document.getElementById('viewerCount').textContent = viewerCount;
+      })
+      .on('broadcast', { event: 'viewer-left' }, () => {
+        viewerCount = Math.max(0, viewerCount - 1);
+        document.getElementById('viewerCount').textContent = viewerCount;
+      })
+      .on('broadcast', { event: 'love-tap' }, ({ payload }) => {
+        if (!payload?.count) return;
+        for (let i = 0; i < Math.min(payload.count, 3); i++) {
+          setTimeout(() => {
+            const x = 30 + Math.random() * (window.innerWidth - 60);
+            const y = window.innerHeight - 160 - Math.random() * 80;
+            spawnHearts(x, y);
+          }, i * 120);
+        }
+        loveTotal += payload.count;
+        showLoveCount();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') resolve(); // ✅ signal ready
+      });
 
-  initTapLove();
+    // Fallback — resolve after 3s even if not SUBSCRIBED
+    setTimeout(resolve, 3000);
+  });
+}
 }
 
 function addChatMsg(username, text, isGift=false, isSystem=false) {

@@ -1,111 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>VIBES — Top Up Coins</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    :root { --bg:#0a0a0a; --surface:#111; --border:#1e1e1e; --accent:#ff2d55; --accent2:#ff6b35; --gold:#ffd700; --text:#f0f0f0; --muted:#666; }
-    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:40px; }
-
-    .top-bar { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; position:sticky; top:0; z-index:10; background:var(--bg); border-bottom:1px solid var(--border); }
-    .back-btn { background:none; border:none; color:var(--text); font-size:22px; cursor:pointer; }
-    .page-title { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:2px; background:linear-gradient(135deg,var(--gold),#ff9500); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-
-    .balance-card { margin:20px 16px; background:linear-gradient(135deg,#1a1400,#2a2000); border:1px solid rgba(255,215,0,0.2); border-radius:20px; padding:24px; display:flex; align-items:center; justify-content:space-between; }
-    .balance-label { font-size:12px; color:rgba(255,215,0,0.6); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
-    .balance-amount { font-size:36px; font-weight:800; color:var(--gold); }
-    .balance-sub { font-size:12px; color:var(--muted); margin-top:4px; }
-    .coin-icon-big { font-size:50px; }
-
-    .earnings-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 16px 24px; }
-    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; }
-    .stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
-    .stat-value { font-size:20px; font-weight:700; }
-    .stat-value.earned { color:#22c55e; }
-
-    .section-title { font-size:16px; font-weight:700; padding:0 16px; margin-bottom:14px; }
-
-    /* ✅ FIX: Package grid with clear selected state */
-    .packages-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; padding:0 16px; margin-bottom:24px; }
-    .pkg-card { background:var(--surface); border:2px solid var(--border); border-radius:16px; padding:18px 14px; cursor:pointer; transition:all 0.15s; position:relative; text-align:center; }
-    .pkg-card:active { transform:scale(0.97); }
-    .pkg-card.selected { border-color:var(--gold); background:rgba(255,215,0,0.07); }
-    .pkg-popular { position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--gold); color:#000; font-size:10px; font-weight:800; padding:3px 10px; border-radius:20px; letter-spacing:1px; white-space:nowrap; }
-    .pkg-icon { font-size:30px; margin-bottom:8px; }
-    .pkg-name { font-size:14px; font-weight:600; margin-bottom:4px; }
-    .pkg-coins { font-size:22px; font-weight:800; color:var(--gold); }
-    .pkg-bonus { font-size:11px; color:#22c55e; font-weight:600; min-height:16px; }
-    .pkg-price { font-size:14px; font-weight:700; margin-top:8px; }
-
-    .payment-section { padding:0 16px; margin-bottom:24px; }
-    .payment-options { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
-    .payment-option { display:flex; align-items:center; gap:14px; background:var(--surface); border:2px solid var(--border); border-radius:14px; padding:14px 16px; cursor:pointer; transition:border-color 0.2s; }
-    .payment-option.selected { border-color:var(--accent); }
-    .payment-icon { font-size:28px; flex-shrink:0; }
-    .payment-name { font-size:14px; font-weight:600; }
-    .payment-sub { font-size:12px; color:var(--muted); }
-    .payment-radio { margin-left:auto; width:20px; height:20px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.2s; }
-    .payment-option.selected .payment-radio { border-color:var(--accent); background:var(--accent); }
-    .payment-option.selected .payment-radio::after { content:''; width:8px; height:8px; border-radius:50%; background:white; }
-
-    .receipt-section { padding:0 16px; margin-bottom:24px; }
-    .bank-info { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
-    .bank-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
-    .bank-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .bank-label { font-size:12px; color:var(--muted); }
-    .bank-value { font-size:14px; font-weight:600; }
-    .copy-btn { background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); border-radius:6px; color:var(--gold); font-size:12px; padding:4px 10px; cursor:pointer; }
-    .receipt-upload { border:2px dashed var(--border); border-radius:14px; padding:24px; text-align:center; cursor:pointer; position:relative; transition:border-color 0.2s; }
-    .receipt-upload:hover { border-color:var(--accent); }
-    .receipt-upload input { position:absolute; inset:0; opacity:0; cursor:pointer; }
-    .receipt-icon { font-size:32px; margin-bottom:8px; }
-    .receipt-text { font-size:14px; color:var(--muted); }
-    .receipt-preview { display:none; width:100%; border-radius:10px; margin-top:10px; max-height:180px; object-fit:cover; }
-
-    .confirm-section { padding:0 16px; }
-    .total-row { display:flex; justify-content:space-between; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
-    .total-label { font-size:13px; color:var(--muted); margin-bottom:4px; }
-    .total-coins { font-size:20px; font-weight:800; color:var(--gold); }
-    .total-price { font-size:18px; font-weight:700; }
-
-    .confirm-btn { width:100%; padding:16px; background:linear-gradient(135deg,var(--gold),#ff9500); border:none; border-radius:14px; color:#000; font-family:'DM Sans',sans-serif; font-size:16px; font-weight:800; cursor:pointer; transition:opacity 0.2s; }
-    .confirm-btn:disabled { opacity:0.4; cursor:not-allowed; }
-
-    .history-section { padding:0 16px; margin-top:32px; }
-    .history-item { display:flex; align-items:center; gap:12px; background:var(--surface); border-radius:12px; padding:14px; margin-bottom:10px; }
-    .history-icon { font-size:28px; }
-    .history-info { flex:1; }
-    .history-name { font-size:14px; font-weight:600; }
-    .history-date { font-size:12px; color:var(--muted); }
-    .history-amount { font-size:15px; font-weight:700; color:var(--gold); white-space:nowrap; }
-    .history-status { font-size:11px; padding:3px 8px; border-radius:6px; font-weight:600; margin-top:3px; display:inline-block; }
-    .status-pending { background:rgba(255,165,0,0.15); color:orange; }
-    .status-approved { background:rgba(34,197,94,0.15); color:#22c55e; }
-    .status-rejected { background:rgba(255,45,85,0.15); color:var(--accent); }
-
-    .modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; padding:32px; }
-    .modal-overlay.show { display:flex; }
-    .modal-card { background:var(--surface); border-radius:20px; padding:32px 24px; text-align:center; width:100%; max-width:320px; }
-    .modal-emoji { font-size:60px; margin-bottom:16px; }
-    .modal-title { font-size:22px; font-weight:700; margin-bottom:8px; }
-    .modal-sub { font-size:14px; color:var(--muted); line-height:1.5; margin-bottom:24px; }
-    .modal-btn { width:100%; padding:14px; background:var(--accent); border:none; border-radius:12px; color:white; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; }
-
-    .spinner { width:30px; height:30px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin:20px auto; }
-    @keyframes spin { to{transform:rotate(360deg)} }
-  </style>
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#ff2d55"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--accent2:#ff6b35;--gold:#ffd700;--text:#f0f0f0;--muted:#666;--green:#22c55e}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .page-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;background:linear-gradient(135deg,var(--gold),#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+    /* Balance */
+    .balance-card{margin:20px 16px;background:linear-gradient(135deg,#1a1400,#2a2000);border:1px solid rgba(255,215,0,0.25);border-radius:20px;padding:22px;display:flex;align-items:center;justify-content:space-between}
+    .balance-label{font-size:11px;color:rgba(255,215,0,0.6);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+    .balance-amount{font-size:34px;font-weight:800;color:var(--gold)}
+    .balance-sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .coin-icon-big{font-size:48px}
+
+    /* Status banner */
+    .status-banner{margin:0 16px 16px;border-radius:14px;padding:14px 16px;font-size:14px;font-weight:600;display:none}
+    .status-banner.success{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:var(--green);display:flex;align-items:center;gap:10px}
+    .status-banner.pending{background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);color:orange;display:flex;align-items:center;gap:10px}
+    .status-banner.failed{background:rgba(255,45,85,0.1);border:1px solid rgba(255,45,85,0.3);color:var(--accent);display:flex;align-items:center;gap:10px}
+
+    /* Packages */
+    .section-title{font-size:16px;font-weight:700;padding:0 16px;margin-bottom:14px}
+    .packages-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px;margin-bottom:28px}
+    .pkg-card{background:var(--surface);border:2px solid var(--border);border-radius:16px;padding:18px 12px;cursor:pointer;transition:all 0.15s;position:relative;text-align:center}
+    .pkg-card:active{transform:scale(0.97)}
+    .pkg-card.selected{border-color:var(--gold);background:rgba(255,215,0,0.07)}
+    .pkg-popular{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:#000;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:1px;white-space:nowrap}
+    .pkg-icon{font-size:30px;margin-bottom:8px}
+    .pkg-name{font-size:14px;font-weight:600;margin-bottom:4px}
+    .pkg-coins{font-size:22px;font-weight:800;color:var(--gold)}
+    .pkg-bonus{font-size:11px;color:var(--green);font-weight:700;min-height:16px}
+    .pkg-price{font-size:16px;font-weight:700;margin-top:8px}
+
+    /* Payment method */
+    .pay-methods{display:flex;flex-direction:column;gap:10px;padding:0 16px;margin-bottom:24px}
+    .pay-method{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:border-color 0.2s}
+    .pay-method.selected{border-color:var(--accent)}
+    .pay-method-icon{font-size:26px;flex-shrink:0;width:40px;text-align:center}
+    .pay-method-info{flex:1}
+    .pay-method-name{font-size:14px;font-weight:700}
+    .pay-method-sub{font-size:12px;color:var(--muted)}
+    .pay-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px}
+    .pay-badge.auto{background:rgba(34,197,94,0.15);color:var(--green)}
+    .pay-badge.manual{background:rgba(255,165,0,0.15);color:orange}
+    .pay-radio{margin-left:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;transition:all 0.2s;display:flex;align-items:center;justify-content:center}
+    .pay-method.selected .pay-radio{border-color:var(--accent);background:var(--accent)}
+    .pay-method.selected .pay-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:white}
+
+    /* Manual payment info */
+    .manual-info{margin:0 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:none}
+    .manual-info.show{display:block}
+    .manual-header{padding:12px 16px;background:rgba(255,165,0,0.07);border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:orange}
+    .manual-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .manual-row:last-child{border-bottom:none}
+    .manual-label{font-size:12px;color:var(--muted)}
+    .manual-val{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .copy-btn{background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;color:var(--gold);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:4px 10px;cursor:pointer}
+    .manual-note{padding:12px 16px;font-size:12px;color:var(--muted);background:rgba(255,255,255,0.02);text-align:center}
+
+    /* Receipt upload */
+    .receipt-upload-wrap{margin:0 16px 20px;display:none}
+    .receipt-upload-wrap.show{display:block}
+    .receipt-upload{border:2px dashed var(--border);border-radius:14px;padding:24px;text-align:center;cursor:pointer;position:relative;transition:border-color 0.2s}
+    .receipt-upload:hover{border-color:var(--accent)}
+    .receipt-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .receipt-icon{font-size:32px;margin-bottom:8px}
+    .receipt-text{font-size:14px;color:var(--muted)}
+    .receipt-preview{display:none;width:100%;border-radius:10px;margin-top:10px;max-height:200px;object-fit:cover}
+
+    /* Summary + CTA */
+    .summary-card{margin:0 16px 16px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px}
+    .summary-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .summary-row:last-child{margin-bottom:0}
+    .summary-label{font-size:13px;color:var(--muted)}
+    .summary-value{font-size:15px;font-weight:700}
+    .summary-divider{height:1px;background:var(--border);margin:12px 0}
+    .summary-total{font-size:20px;font-weight:800;color:var(--gold)}
+    .summary-price{font-size:18px;font-weight:800}
+
+    .pay-btn{display:block;margin:0 16px;width:calc(100% - 32px);padding:17px;background:linear-gradient(135deg,var(--gold),#ff9500);border:none;border-radius:14px;color:#000;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800;cursor:pointer;transition:opacity 0.2s;text-align:center}
+    .pay-btn:disabled{opacity:0.4;cursor:not-allowed}
+    .pay-btn.toyyib{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:white}
+
+    /* Security badges */
+    .security-row{display:flex;justify-content:center;gap:16px;margin:14px 16px;flex-wrap:wrap}
+    .sec-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+
+    /* History */
+    .history-section{padding:0 16px;margin-top:32px}
+    .history-item{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer}
+    .history-icon{font-size:26px;flex-shrink:0}
+    .history-info{flex:1;min-width:0}
+    .history-name{font-size:14px;font-weight:600}
+    .history-date{font-size:12px;color:var(--muted)}
+    .history-right{text-align:right;flex-shrink:0}
+    .history-amount{font-size:14px;font-weight:700;color:var(--gold)}
+    .history-status{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;margin-top:3px;display:inline-block}
+    .s-pending{background:rgba(255,165,0,0.15);color:orange}
+    .s-approved{background:rgba(34,197,94,0.15);color:var(--green)}
+    .s-rejected{background:rgba(255,45,85,0.15);color:var(--accent)}
+
+    /* Loading overlay */
+    .loading-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+    .loading-overlay.show{display:flex}
+    .loading-text{font-size:16px;font-weight:600;color:white}
+    .loading-sub{font-size:13px;color:var(--muted)}
+
+    .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Toast */
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid #333;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;color:white;z-index:999;display:none;white-space:nowrap}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  </style>
 </head>
 <body>
+
+<div class="toast" id="toast"></div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Memproses...</div>
+  <div class="loading-sub" id="loadingSub">Sila tunggu sebentar</div>
+</div>
 
 <div class="top-bar">
   <button class="back-btn" onclick="history.back()">←</button>
@@ -113,155 +145,295 @@
   <span style="width:22px"></span>
 </div>
 
+<!-- Payment status banner (bila balik dari ToyyibPay) -->
+<div class="status-banner" id="statusBanner"></div>
+
+<!-- Balance -->
 <div class="balance-card">
   <div>
-    <div class="balance-label">My Coin Balance</div>
+    <div class="balance-label">Baki Semasa</div>
     <div class="balance-amount">💎 <span id="balanceAmount">—</span></div>
     <div class="balance-sub">≈ RM <span id="balanceMYR">0.00</span></div>
   </div>
   <div class="coin-icon-big">🪙</div>
 </div>
 
-<div class="earnings-row">
-  <div class="stat-card">
-    <div class="stat-label">Total Earned</div>
-    <div class="stat-value earned">💎 <span id="totalEarned">0</span></div>
-  </div>
-  <div class="stat-card" onclick="scrollToHistory()" style="cursor:pointer">
-    <div class="stat-label">History</div>
-    <div class="stat-value" style="color:var(--accent)">Lihat →</div>
-  </div>
-</div>
-
+<!-- Packages -->
 <div class="section-title">Pilih Pakej 📦</div>
-<div class="packages-grid" id="packagesGrid"><div class="spinner"></div></div>
+<div class="packages-grid" id="packagesGrid"><div class="spinner" style="grid-column:1/-1"></div></div>
 
-<div class="payment-section">
-  <div class="section-title" style="padding:0;margin-bottom:14px">Cara Bayar 💳</div>
-  <div class="payment-options">
-    <!-- ✅ FIX: Use explicit IDs for payment options -->
-    <div class="payment-option selected" id="payOpt_manual" onclick="selectPayment('manual')">
-      <div class="payment-icon">🏦</div>
-      <div><div class="payment-name">Bank Transfer / DuitNow</div><div class="payment-sub">Transfer manual, hantar resit</div></div>
-      <div class="payment-radio"></div>
+<!-- Payment Method -->
+<div class="section-title">Cara Bayar 💳</div>
+<div class="pay-methods">
+  <div class="pay-method selected" id="pm_toyyibpay" onclick="selectMethod('toyyibpay')">
+    <div class="pay-method-icon">🏦</div>
+    <div class="pay-method-info">
+      <div class="pay-method-name">FPX / Online Banking <span class="pay-badge auto">AUTO ✓</span></div>
+      <div class="pay-method-sub">Maybank, CIMB, Public Bank, RHB dll</div>
     </div>
-    <div class="payment-option" id="payOpt_tng" onclick="selectPayment('tng')">
-      <div class="payment-icon">📱</div>
-      <div><div class="payment-name">Touch 'n Go / E-Wallet</div><div class="payment-sub">TNG, GrabPay, Boost</div></div>
-      <div class="payment-radio"></div>
+    <div class="pay-radio"></div>
+  </div>
+  <div class="pay-method" id="pm_card" onclick="selectMethod('card')">
+    <div class="pay-method-icon">💳</div>
+    <div class="pay-method-info">
+      <div class="pay-method-name">Kad Kredit/Debit <span class="pay-badge auto">AUTO ✓</span></div>
+      <div class="pay-method-sub">Visa, Mastercard — via ToyyibPay</div>
     </div>
+    <div class="pay-radio"></div>
+  </div>
+  <div class="pay-method" id="pm_manual" onclick="selectMethod('manual')">
+    <div class="pay-method-icon">📱</div>
+    <div class="pay-method-info">
+      <div class="pay-method-name">DuitNow QR / Transfer Manual <span class="pay-badge manual">MANUAL</span></div>
+      <div class="pay-method-sub">Transfer & hantar resit — 1–24 jam</div>
+    </div>
+    <div class="pay-radio"></div>
   </div>
 </div>
 
-<div class="receipt-section" id="receiptSection">
-  <div class="bank-info">
-    <div class="bank-title">📋 Info Pembayaran</div>
-    <div class="bank-row"><span class="bank-label">Bank</span><span class="bank-value">Maybank</span></div>
-    <div class="bank-row"><span class="bank-label">No. Akaun</span><span class="bank-value">1234-5678-9012</span><button class="copy-btn" onclick="copyText('1234-5678-9012')">Copy</button></div>
-    <div class="bank-row"><span class="bank-label">Nama</span><span class="bank-value">VIBES PLATFORM</span></div>
-    <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--muted)">⚠️ Letak <strong>username kau</strong> dalam nota pembayaran</div>
+<!-- Manual payment info (bank details) -->
+<div class="manual-info" id="manualInfo">
+  <div class="manual-header">📋 Maklumat Pembayaran</div>
+  <div class="manual-row">
+    <span class="manual-label">Bank</span>
+    <span class="manual-val" id="bankName">Maybank</span>
   </div>
-  <div class="receipt-upload" id="receiptUpload">
-    <input type="file" accept="image/*" onchange="previewReceipt(this)" />
+  <div class="manual-row">
+    <span class="manual-label">No. Akaun</span>
+    <span class="manual-val">
+      <span id="bankAccount">1234-5678-9012</span>
+      <button class="copy-btn" onclick="copyText(document.getElementById('bankAccount').textContent)">Copy</button>
+    </span>
+  </div>
+  <div class="manual-row">
+    <span class="manual-label">Nama</span>
+    <span class="manual-val" id="bankHolder">VIBES PLATFORM SDN BHD</span>
+  </div>
+  <div class="manual-note">⚠️ Wajib tulis <strong>username VIBES</strong> dalam nota pemindahan</div>
+</div>
+
+<!-- Receipt upload (manual only) -->
+<div class="receipt-upload-wrap" id="receiptWrap">
+  <div class="receipt-upload">
+    <input type="file" accept="image/*" onchange="previewReceipt(this)"/>
     <div class="receipt-icon">📎</div>
-    <div class="receipt-text" id="receiptText">Upload resit pembayaran</div>
-    <img class="receipt-preview" id="receiptPreview" />
+    <div class="receipt-text" id="receiptText">Tap untuk upload resit / screenshot</div>
+    <img class="receipt-preview" id="receiptPreview"/>
   </div>
 </div>
 
-<div class="confirm-section">
-  <div class="total-row">
-    <div>
-      <div class="total-label">Kau akan dapat</div>
-      <div class="total-coins" id="totalCoinsDisplay">Pilih pakej dulu</div>
-    </div>
-    <div class="total-price" id="totalPriceDisplay">RM —</div>
+<!-- Summary -->
+<div class="summary-card" id="summaryCard" style="display:none">
+  <div class="summary-row">
+    <span class="summary-label">Pakej</span>
+    <span class="summary-value" id="sumPkg">—</span>
   </div>
-  <button class="confirm-btn" id="confirmBtn" onclick="submitTopup()" disabled>Pilih Pakej Dahulu</button>
+  <div class="summary-row">
+    <span class="summary-label">Coins</span>
+    <span class="summary-value summary-total" id="sumCoins">💎 —</span>
+  </div>
+  <div class="summary-divider"></div>
+  <div class="summary-row">
+    <span class="summary-label">Jumlah Bayar</span>
+    <span class="summary-value summary-price" id="sumPrice">RM —</span>
+  </div>
 </div>
 
-<div class="history-section" id="historySection">
+<!-- Pay button -->
+<button class="pay-btn" id="payBtn" onclick="processPayment()" disabled>Pilih Pakej Dulu</button>
+
+<!-- Security -->
+<div class="security-row">
+  <div class="sec-badge">🔒 SSL Selamat</div>
+  <div class="sec-badge">🏦 Via ToyyibPay</div>
+  <div class="sec-badge">⚡ Auto Credit</div>
+</div>
+
+<!-- History -->
+<div class="history-section">
   <div class="section-title" style="padding:0;margin-bottom:14px">Sejarah Top Up 📜</div>
   <div id="historyList"><div class="spinner"></div></div>
 </div>
 
-<div class="modal-overlay" id="successModal">
-  <div class="modal-card">
-    <div class="modal-emoji">🎉</div>
-    <div class="modal-title">Permintaan Dihantar!</div>
-    <div class="modal-sub">Resit sedang disemak. Coins akan dikreditkan dalam 1–24 jam selepas pengesahan admin.</div>
-    <button class="modal-btn" onclick="closeSuccessModal()">OK, Faham!</button>
-  </div>
-</div>
-
 <script>
-let currentUser = null;
-let packages = [];
-let selectedPkg = null;
-let selectedPayment = 'manual';
+let currentUser = null, currentProfile = null;
+let packages = [], selectedPkg = null;
+let selectedMethod = 'toyyibpay';
 let receiptFile = null;
 let myCoins = 0;
+
+// ⚠️ TUKAR ini kepada bank details kau
+const BANK_DETAILS = {
+  bank: 'Maybank',
+  account: '1234-5678-9012',
+  holder: 'NAMA PENUH KAU'
+};
+
+function showToast(msg, ms=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function showLoading(text, sub='') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingSub').textContent = sub;
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
 
 async function init() {
   currentUser = await getCurrentUser();
   if (!currentUser) return window.location.href = 'auth.html';
+  currentProfile = await getCurrentProfile();
 
-  // ✅ FIX: Auto-init wallet
+  // Check return from ToyyibPay
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status');
+  const ref = params.get('ref');
+
+  if (status === 'success' && ref) {
+    await handlePaymentReturn(ref);
+  } else if (status === 'cancel') {
+    showStatusBanner('pending', '⏳ Pembayaran dibatalkan. Cuba lagi.');
+  }
+
+  // Load wallet
   let { data: wallet } = await sb.from('user_coins').select('*').eq('user_id', currentUser.id).maybeSingle();
   if (!wallet) {
-    const { data: newW } = await sb.from('user_coins').insert({ user_id: currentUser.id, coins: 0, total_earned: 0 }).select().single();
-    wallet = newW;
+    const { data: nw } = await sb.from('user_coins').insert({ user_id: currentUser.id, coins: 0, total_earned: 0 }).select().single();
+    wallet = nw;
   }
   myCoins = wallet?.coins || 0;
   document.getElementById('balanceAmount').textContent = formatCount(myCoins);
   document.getElementById('balanceMYR').textContent = (myCoins * 0.04).toFixed(2);
-  document.getElementById('totalEarned').textContent = formatCount(wallet?.total_earned || 0);
 
   // Load packages
   const { data: pkgs } = await sb.from('coin_packages').select('*').eq('is_active', true).order('price_myr');
   packages = pkgs || [];
   renderPackages();
+
+  // Set bank details
+  document.getElementById('bankName').textContent = BANK_DETAILS.bank;
+  document.getElementById('bankAccount').textContent = BANK_DETAILS.account;
+  document.getElementById('bankHolder').textContent = BANK_DETAILS.holder;
+
   loadHistory();
+
+  // Subscribe to realtime topup approval
+  sb.channel(`topup-realtime-${currentUser.id}`)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'topup_requests',
+      filter: `user_id=eq.${currentUser.id}`
+    }, async ({ new: r }) => {
+      if (r.status === 'approved') {
+        const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', currentUser.id).maybeSingle();
+        if (w) {
+          myCoins = w.coins;
+          document.getElementById('balanceAmount').textContent = formatCount(myCoins);
+          document.getElementById('balanceMYR').textContent = (myCoins * 0.04).toFixed(2);
+        }
+        showStatusBanner('success', `✅ 💎${r.coins_amount.toLocaleString()} coins berjaya dikreditkan!`);
+        loadHistory();
+      }
+    })
+    .subscribe();
+}
+
+// Handle return from ToyyibPay payment page
+async function handlePaymentReturn(topupId) {
+  showLoading('Mengesahkan pembayaran...', 'Sila tunggu sebentar');
+  await new Promise(r => setTimeout(r, 2000)); // wait for callback to process
+
+  const { data } = await sb.from('topup_requests').select('*').eq('id', topupId).maybeSingle();
+  hideLoading();
+
+  if (data?.status === 'approved') {
+    showStatusBanner('success', `✅ Berjaya! 💎${data.coins_amount.toLocaleString()} coins dikreditkan!`);
+    const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', currentUser.id).maybeSingle();
+    if (w) {
+      myCoins = w.coins;
+      document.getElementById('balanceAmount').textContent = formatCount(myCoins);
+    }
+  } else if (data?.status === 'pending') {
+    showStatusBanner('pending', '⏳ Pembayaran sedang disahkan. Coins akan dikreditkan automatik.');
+  } else {
+    showStatusBanner('failed', '❌ Pembayaran gagal atau dibatalkan. Sila cuba lagi.');
+  }
+
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
+}
+
+function showStatusBanner(type, msg) {
+  const el = document.getElementById('statusBanner');
+  el.className = 'status-banner ' + type;
+  el.innerHTML = (type === 'success' ? '✅' : type === 'pending' ? '⏳' : '❌') + ' ' + msg.replace(/^[✅⏳❌]\s*/, '');
 }
 
 const pkgIcons = ['🌱','🌟','💫','🚀','🌌','💥'];
 
 function renderPackages() {
-  document.getElementById('packagesGrid').innerHTML = packages.map((p, i) => `
-    <div class="pkg-card" id="pkg_${p.id}" onclick="selectPkg('${p.id}')">
+  document.getElementById('packagesGrid').innerHTML = packages.map((p, i) => {
+    const total = p.coins + (p.bonus_coins || 0);
+    return `<div class="pkg-card" id="pkg_${p.id}" onclick="selectPkg('${p.id}')">
       ${p.is_popular ? '<div class="pkg-popular">POPULAR ⭐</div>' : ''}
       <div class="pkg-icon">${pkgIcons[i] || '💎'}</div>
       <div class="pkg-name">${p.name}</div>
       <div class="pkg-coins">💎 ${p.coins.toLocaleString()}</div>
-      <div class="pkg-bonus">${p.bonus_coins > 0 ? `+${p.bonus_coins} BONUS` : ''}</div>
+      <div class="pkg-bonus">${p.bonus_coins > 0 ? `+${p.bonus_coins} BONUS` : '&nbsp;'}</div>
       <div class="pkg-price">RM ${Number(p.price_myr).toFixed(2)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
-// ✅ FIX: selectPkg uses explicit ID, clear previous selection
 function selectPkg(pkgId) {
-  // Clear all
   document.querySelectorAll('.pkg-card').forEach(el => el.classList.remove('selected'));
-  const card = document.getElementById('pkg_' + pkgId);
-  if (card) card.classList.add('selected');
-
+  document.getElementById('pkg_' + pkgId)?.classList.add('selected');
   selectedPkg = packages.find(p => p.id === pkgId);
   if (!selectedPkg) return;
-
-  const totalCoins = selectedPkg.coins + (selectedPkg.bonus_coins || 0);
-  document.getElementById('totalCoinsDisplay').textContent = `💎 ${totalCoins.toLocaleString()} coins`;
-  document.getElementById('totalPriceDisplay').textContent = `RM ${Number(selectedPkg.price_myr).toFixed(2)}`;
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = false;
-  btn.textContent = `Bayar RM ${Number(selectedPkg.price_myr).toFixed(2)} →`;
+  updateSummary();
 }
 
-// ✅ FIX: selectPayment uses explicit IDs
-function selectPayment(method) {
-  selectedPayment = method;
-  document.querySelectorAll('.payment-option').forEach(el => el.classList.remove('selected'));
-  const opt = document.getElementById('payOpt_' + method);
-  if (opt) opt.classList.add('selected');
+function selectMethod(method) {
+  selectedMethod = method;
+  document.querySelectorAll('.pay-method').forEach(el => el.classList.remove('selected'));
+  document.getElementById('pm_' + method)?.classList.add('selected');
+
+  // Show/hide manual info
+  const manualInfo = document.getElementById('manualInfo');
+  const receiptWrap = document.getElementById('receiptWrap');
+  if (method === 'manual') {
+    manualInfo.classList.add('show');
+    receiptWrap.classList.add('show');
+  } else {
+    manualInfo.classList.remove('show');
+    receiptWrap.classList.remove('show');
+  }
+  updateSummary();
+}
+
+function updateSummary() {
+  if (!selectedPkg) return;
+  const total = selectedPkg.coins + (selectedPkg.bonus_coins || 0);
+  document.getElementById('summaryCard').style.display = 'block';
+  document.getElementById('sumPkg').textContent = selectedPkg.name;
+  document.getElementById('sumCoins').textContent = `💎 ${total.toLocaleString()} coins`;
+  document.getElementById('sumPrice').textContent = `RM ${Number(selectedPkg.price_myr).toFixed(2)}`;
+
+  const btn = document.getElementById('payBtn');
+  btn.disabled = false;
+
+  if (selectedMethod === 'manual') {
+    btn.textContent = `📤 Hantar Resit — RM ${Number(selectedPkg.price_myr).toFixed(2)}`;
+    btn.className = 'pay-btn';
+  } else {
+    btn.textContent = `🏦 Bayar RM ${Number(selectedPkg.price_myr).toFixed(2)} via Online Banking`;
+    btn.className = 'pay-btn toyyib';
+  }
 }
 
 function previewReceipt(input) {
@@ -273,82 +445,135 @@ function previewReceipt(input) {
   document.getElementById('receiptText').textContent = '✅ ' + receiptFile.name;
 }
 
-async function submitTopup() {
-  if (!selectedPkg) return;
-  if (!receiptFile) { alert('Sila upload resit pembayaran terlebih dahulu.'); return; }
+// ── PROCESS PAYMENT ───────────────────────────────
+async function processPayment() {
+  if (!selectedPkg) return showToast('Pilih pakej dulu!');
+  if (!currentUser) return window.location.href = 'auth.html';
 
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = true; btn.textContent = 'Menghantar...';
+  if (selectedMethod === 'manual') {
+    await submitManualTopup();
+  } else {
+    await initiateToyyibPay();
+  }
+}
+
+// ── AUTO: ToyyibPay FPX/Card ─────────────────────
+async function initiateToyyibPay() {
+  showLoading('Membuat bil pembayaran...', 'Connecting to ToyyibPay');
 
   try {
-    let receiptUrl = null;
-    if (receiptFile) {
-      const ext = receiptFile.name.split('.').pop();
-      const path = `receipts/${currentUser.id}/${Date.now()}.${ext}`;
-      const { data: upData, error: upErr } = await sb.storage.from('avatars').upload(path, receiptFile, { upsert: true });
-      if (!upErr) {
-        const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path);
-        receiptUrl = publicUrl;
-      }
+    const res = await fetch('/.netlify/functions/payment-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        packageId: selectedPkg.id,
+        coins: selectedPkg.coins + (selectedPkg.bonus_coins || 0),
+        priceMyr: selectedPkg.price_myr,
+        username: currentProfile?.username || 'user',
+        email: currentUser.email || '',
+        packageName: selectedPkg.name
+      })
+    });
+
+    const data = await res.json();
+    hideLoading();
+
+    if (!res.ok || !data.paymentUrl) {
+      throw new Error(data.error || 'Gagal buat bil pembayaran');
     }
 
-    const totalCoins = selectedPkg.coins + (selectedPkg.bonus_coins || 0);
-    const { error } = await sb.from('topup_requests').insert({
+    // Redirect to ToyyibPay payment page
+    window.location.href = data.paymentUrl;
+
+  } catch (err) {
+    hideLoading();
+    showToast('❌ ' + err.message, 5000);
+    console.error('ToyyibPay error:', err);
+  }
+}
+
+// ── MANUAL: Upload resit ─────────────────────────
+async function submitManualTopup() {
+  if (!receiptFile) return showToast('Sila upload resit pembayaran!');
+
+  showLoading('Menghantar resit...', 'Sila tunggu');
+
+  try {
+    // Upload receipt image
+    let receiptUrl = null;
+    const ext = receiptFile.name.split('.').pop();
+    const path = `receipts/${currentUser.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('avatars').upload(path, receiptFile, { upsert: true });
+    if (!upErr) {
+      const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path);
+      receiptUrl = publicUrl;
+    }
+
+    const total = selectedPkg.coins + (selectedPkg.bonus_coins || 0);
+    await sb.from('topup_requests').insert({
       user_id: currentUser.id,
       package_id: selectedPkg.id,
-      coins_amount: totalCoins,
+      coins_amount: total,
       price_myr: selectedPkg.price_myr,
-      payment_method: selectedPayment,
+      payment_method: 'manual',
       receipt_url: receiptUrl,
       status: 'pending'
     });
 
-    if (error) throw error;
-    document.getElementById('successModal').classList.add('show');
+    hideLoading();
+    showStatusBanner('pending', '⏳ Resit dihantar! Coins akan dikreditkan dalam 1–24 jam selepas disemak admin.');
     resetForm();
     loadHistory();
+
   } catch (err) {
-    alert('Gagal: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = `Bayar RM ${Number(selectedPkg.price_myr).toFixed(2)} →`;
+    hideLoading();
+    showToast('❌ Gagal: ' + err.message);
   }
 }
 
 function resetForm() {
   selectedPkg = null; receiptFile = null;
   document.querySelectorAll('.pkg-card').forEach(el => el.classList.remove('selected'));
-  document.getElementById('totalCoinsDisplay').textContent = 'Pilih pakej dulu';
-  document.getElementById('totalPriceDisplay').textContent = 'RM —';
+  document.getElementById('summaryCard').style.display = 'none';
   document.getElementById('receiptPreview').style.display = 'none';
-  document.getElementById('receiptText').textContent = 'Upload resit pembayaran';
-  document.getElementById('confirmBtn').disabled = true;
-  document.getElementById('confirmBtn').textContent = 'Pilih Pakej Dahulu';
-}
-
-async function closeSuccessModal() {
-  document.getElementById('successModal').classList.remove('show');
+  document.getElementById('receiptText').textContent = 'Tap untuk upload resit / screenshot';
+  const btn = document.getElementById('payBtn');
+  btn.disabled = true; btn.textContent = 'Pilih Pakej Dulu';
 }
 
 async function loadHistory() {
-  const { data } = await sb.from('topup_requests').select('*, coin_packages(name)').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(10);
+  const { data } = await sb.from('topup_requests')
+    .select('*, coin_packages(name)')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .limit(15);
+
   const list = document.getElementById('historyList');
-  if (!data || data.length === 0) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:14px">Belum ada sejarah top up</div>'; return; }
+  if (!data?.length) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:14px">Belum ada sejarah top up</div>'; return; }
+
+  const methodLabel = { toyyibpay: '🏦 FPX/Online', card: '💳 Kad', manual: '📱 Manual' };
+
   list.innerHTML = data.map(t => `
     <div class="history-item">
-      <div class="history-icon">🪙</div>
+      <div class="history-icon">${t.payment_method === 'manual' ? '📱' : '🏦'}</div>
       <div class="history-info">
-        <div class="history-name">${t.coin_packages?.name || 'Top Up'} — 💎 ${t.coins_amount.toLocaleString()}</div>
-        <div class="history-date">${timeAgo(t.created_at)}</div>
+        <div class="history-name">${t.coin_packages?.name || 'Top Up'} — 💎${t.coins_amount.toLocaleString()}</div>
+        <div class="history-date">${methodLabel[t.payment_method] || t.payment_method} • ${timeAgo(t.created_at)}</div>
       </div>
-      <div style="text-align:right">
+      <div class="history-right">
         <div class="history-amount">RM ${Number(t.price_myr).toFixed(2)}</div>
-        <div class="history-status status-${t.status}">${t.status === 'pending' ? '⏳ Pending' : t.status === 'approved' ? '✅ Approved' : '❌ Rejected'}</div>
+        <span class="history-status s-${t.status}">${
+          t.status === 'pending' ? '⏳ Pending' :
+          t.status === 'approved' ? '✅ Berjaya' : '❌ Ditolak'
+        }</span>
       </div>
     </div>`).join('');
 }
 
-function scrollToHistory() { document.getElementById('historySection').scrollIntoView({ behavior:'smooth' }); }
-function copyText(text) { navigator.clipboard.writeText(text).then(() => alert('✅ Copied!')); }
+function copyText(text) {
+  navigator.clipboard.writeText(text.trim()).then(() => showToast('✅ Disalin!'));
+}
 
 init();
 </script>

@@ -287,9 +287,13 @@ let topGifters = {};
 
 const ICE_SERVERS = {
   iceServers: [
+    // ✅ FIX: Tambah free TURN servers — wajib untuk mobile 4G/NAT strict
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    // Free TURN from Open Relay Project
+    { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   ]
 };
 
@@ -468,10 +472,18 @@ async function startLive() {
 }
 
 // ── SIGNALING ────────────────────────────────────
+let sigChannelReady = false;
+let pendingViewers = []; // viewers who joined before channel ready
+
 function startSignaling() {
   sigChannel = sb.channel(`webrtc-sig-${roomId}`, { config: { broadcast: { self: false } } })
     .on('broadcast', { event: 'viewer-join' }, async ({ payload }) => {
-      addHostChat('', `👋 viewer joined`, false, true);
+      if (!sigChannelReady) {
+        // Queue viewer — channel belum ready
+        pendingViewers.push(payload.viewerId);
+        return;
+      }
+      addHostChat('', `👋 ${payload.viewerId.slice(0,8)}... joined`, false, true);
       await createPeerForViewer(payload.viewerId);
     })
     .on('broadcast', { event: 'answer' }, async ({ payload }) => {
@@ -495,7 +507,16 @@ function startSignaling() {
       const conn = peerConnections[payload.viewerId];
       if (conn) { conn.pc.close(); delete peerConnections[payload.viewerId]; }
     })
-    .subscribe();
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        sigChannelReady = true;
+        // ✅ Process any viewers who joined while we were subscribing
+        for (const vid of pendingViewers) {
+          await createPeerForViewer(vid);
+        }
+        pendingViewers = [];
+      }
+    });
 }
 
 async function createPeerForViewer(viewerId) {
