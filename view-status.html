@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>VIBES — Status</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{background:#000;font-family:'DM Sans',sans-serif;height:100dvh;overflow:hidden;user-select:none}
+
+    /* Full screen status */
+    .status-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+    .status-bg{position:absolute;inset:0;transition:background 0.3s}
+    .status-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+    .status-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.3) 0%,transparent 30%,transparent 70%,rgba(0,0,0,0.5) 100%)}
+
+    /* Progress bars */
+    .progress-bars{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;right:12px;display:flex;gap:4px;z-index:20}
+    .prog-bar{flex:1;height:3px;background:rgba(255,255,255,0.3);border-radius:2px;overflow:hidden}
+    .prog-fill{height:100%;background:white;width:0%;transition:none}
+    .prog-fill.done{width:100%}
+    .prog-fill.active{animation:progAnim var(--dur,5s) linear forwards}
+    @keyframes progAnim{from{width:0%}to{width:100%}}
+
+    /* Top bar */
+    .status-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 22px);left:12px;right:12px;display:flex;align-items:center;gap:10px;z-index:20}
+    .s-avatar{width:38px;height:38px;border-radius:50%;border:2px solid white;object-fit:cover;flex-shrink:0}
+    .s-name{font-size:14px;font-weight:700;color:white;flex:1;text-shadow:0 1px 3px rgba(0,0,0,0.5)}
+    .s-time{font-size:12px;color:rgba(255,255,255,0.7)}
+    .close-btn{background:rgba(0,0,0,0.4);border:none;color:white;font-size:20px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+
+    /* Content */
+    .status-content{position:relative;z-index:10;text-align:center;padding:20px;width:100%}
+    .status-emoji-big{font-size:100px;line-height:1;margin-bottom:16px;animation:emojiPop 0.4s cubic-bezier(0.34,1.56,0.64,1)}
+    @keyframes emojiPop{from{transform:scale(0)}to{transform:scale(1)}}
+    .status-text-big{font-size:26px;font-weight:700;line-height:1.3;word-break:break-word;text-shadow:0 2px 8px rgba(0,0,0,0.6);padding:0 16px}
+
+    /* Bottom bar */
+    .status-bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom,16px) + 12px);left:12px;right:12px;z-index:20;display:flex;align-items:center;gap:10px}
+    .reply-input{flex:1;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.3);border-radius:24px;padding:11px 16px;color:white;font-family:'DM Sans',sans-serif;font-size:16px;outline:none}
+    .reply-input::placeholder{color:rgba(255,255,255,0.6)}
+    .reply-btn{background:white;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+
+    /* Views count (own status) */
+    .views-badge{position:absolute;bottom:calc(env(safe-area-inset-bottom,16px) + 16px);right:16px;z-index:20;background:rgba(0,0,0,0.5);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:white;display:flex;align-items:center;gap:5px}
+
+    /* Tap zones */
+    .tap-prev{position:absolute;left:0;top:0;width:35%;height:100%;z-index:15;cursor:pointer}
+    .tap-next{position:absolute;right:0;top:0;width:65%;height:100%;z-index:15;cursor:pointer}
+
+    /* Pause indicator */
+    .pause-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;font-size:50px;opacity:0;pointer-events:none;transition:opacity 0.2s}
+    .pause-indicator.show{opacity:1}
+
+    /* Empty */
+    .empty-screen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+    .empty-screen .em{font-size:60px}
+
+    .spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.2);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div class="status-screen" id="statusScreen">
+  <div class="status-bg" id="statusBg"></div>
+  <img class="status-img" id="statusImg"/>
+  <div class="status-overlay"></div>
+  <div class="progress-bars" id="progressBars"></div>
+
+  <div class="status-top">
+    <img class="s-avatar" id="sAvatar" src="" alt=""/>
+    <div>
+      <div class="s-name" id="sName">—</div>
+      <div class="s-time" id="sTime">—</div>
+    </div>
+    <button class="close-btn" onclick="closeStatus()">✕</button>
+  </div>
+
+  <div class="status-content" id="statusContent">
+    <div class="spinner"></div>
+  </div>
+
+  <div id="replySection">
+    <div class="status-bottom" id="statusBottom">
+      <input class="reply-input" id="replyInput" placeholder="Balas status..." onkeydown="handleReplyKey(event)"/>
+      <button class="reply-btn" onclick="sendReply()">➤</button>
+    </div>
+  </div>
+
+  <div class="views-badge" id="viewsBadge" style="display:none">👁 <span id="viewsCount">0</span></div>
+
+  <!-- Tap zones -->
+  <div class="tap-prev" onclick="prevStatus()"></div>
+  <div class="tap-next" onclick="nextStatus()"></div>
+  <div class="pause-indicator" id="pauseIndicator">⏸</div>
+</div>
+
+<div class="empty-screen" id="emptyScreen" style="display:none">
+  <div class="em">📭</div>
+  <div style="font-size:16px;font-weight:600;color:white">Status dah tamat tempoh</div>
+  <button onclick="history.back()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px 24px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">Balik</button>
+</div>
+
+<script>
+let allStatuses = [];   // all statuses from this user group
+let currentIdx = 0;
+let timer = null;
+let isPaused = false;
+let currentUser = null;
+const DURATION = 5000; // 5s per status
+
+async function init() {
+  currentUser = await getCurrentUser();
+  const params = new URLSearchParams(window.location.search);
+  const startId = params.get('id');
+  const userId = params.get('user'); // optional — view all statuses from a user
+
+  // Load statuses
+  let query = sb.from('status_posts')
+    .select('*, profiles(id, username, display_name, avatar_url)')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: true });
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  } else if (startId) {
+    // Load this status + adjacent ones from same user
+    const { data: s } = await sb.from('status_posts').select('user_id').eq('id', startId).maybeSingle();
+    if (s) query = query.eq('user_id', s.user_id);
+  }
+
+  const { data } = await query.limit(20);
+  allStatuses = data || [];
+
+  if (!allStatuses.length) {
+    document.getElementById('statusScreen').style.display = 'none';
+    document.getElementById('emptyScreen').style.display = 'flex';
+    return;
+  }
+
+  // Find start index
+  if (startId) {
+    const idx = allStatuses.findIndex(s => s.id === startId);
+    currentIdx = idx >= 0 ? idx : 0;
+  }
+
+  renderProgressBars();
+  showStatus(currentIdx);
+}
+
+function renderProgressBars() {
+  document.getElementById('progressBars').innerHTML = allStatuses.map((_, i) =>
+    `<div class="prog-bar"><div class="prog-fill ${i < currentIdx ? 'done' : ''}" id="prog_${i}"></div></div>`
+  ).join('');
+}
+
+async function showStatus(idx) {
+  if (idx >= allStatuses.length) { closeStatus(); return; }
+  if (idx < 0) idx = 0;
+  currentIdx = idx;
+  clearTimeout(timer);
+
+  const s = allStatuses[idx];
+  const profile = s.profiles;
+
+  // Progress bars
+  document.querySelectorAll('.prog-fill').forEach((el, i) => {
+    el.style.animation = 'none';
+    el.className = 'prog-fill ' + (i < idx ? 'done' : '');
+  });
+  const activeProg = document.getElementById('prog_' + idx);
+  if (activeProg) {
+    activeProg.style.setProperty('--dur', (DURATION/1000) + 's');
+    activeProg.className = 'prog-fill active';
+  }
+
+  // Header
+  document.getElementById('sAvatar').src = getAvatarUrl(profile);
+  document.getElementById('sName').textContent = '@' + (profile?.username || 'user');
+  document.getElementById('sTime').textContent = timeAgo(s.created_at);
+
+  // Background
+  const bg = document.getElementById('statusBg');
+  const img = document.getElementById('statusImg');
+  bg.style.background = s.bg_color || '#1a1a2e';
+
+  if (s.type === 'image' && s.image_url) {
+    img.style.display = 'block';
+    img.src = s.image_url;
+  } else {
+    img.style.display = 'none';
+  }
+
+  // Content
+  const content = document.getElementById('statusContent');
+  if (s.type === 'emoji') {
+    content.innerHTML = `<div class="status-emoji-big">${s.emoji}</div>`;
+  } else if (s.type === 'text') {
+    const size = (s.content?.length||0) > 80 ? '20px' : (s.content?.length||0) > 40 ? '24px' : '28px';
+    content.innerHTML = `<div class="status-text-big" style="color:${s.text_color||'#fff'};font-size:${size}">${s.content || ''}</div>`;
+  } else if (s.type === 'image') {
+    content.innerHTML = s.content ? `<div class="status-text-big" style="color:${s.text_color||'#fff'}">${s.content}</div>` : '';
+  }
+
+  // Own status — show views
+  const isOwn = currentUser && s.user_id === currentUser.id;
+  const viewsBadge = document.getElementById('viewsBadge');
+  const replySection = document.getElementById('replySection');
+  if (isOwn) {
+    viewsBadge.style.display = 'flex';
+    document.getElementById('viewsCount').textContent = formatCount(s.views_count || 0);
+    replySection.style.display = 'none';
+  } else {
+    viewsBadge.style.display = 'none';
+    replySection.style.display = 'block';
+    // Record view
+    if (currentUser) {
+      sb.from('status_views').insert({ status_id: s.id, viewer_id: currentUser.id }).then(() => {});
+    }
+  }
+
+  // Auto advance
+  timer = setTimeout(() => nextStatus(), DURATION);
+}
+
+function nextStatus() {
+  if (currentIdx + 1 >= allStatuses.length) { closeStatus(); return; }
+  showStatus(currentIdx + 1);
+}
+
+function prevStatus() {
+  if (currentIdx > 0) showStatus(currentIdx - 1);
+}
+
+// Hold to pause
+document.getElementById('statusScreen').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('input, button')) return;
+  isPaused = true;
+  clearTimeout(timer);
+  document.getElementById('pauseIndicator').classList.add('show');
+  // Pause animation
+  const prog = document.getElementById('prog_' + currentIdx);
+  if (prog) prog.style.animationPlayState = 'paused';
+});
+
+document.getElementById('statusScreen').addEventListener('pointerup', () => {
+  if (!isPaused) return;
+  isPaused = false;
+  document.getElementById('pauseIndicator').classList.remove('show');
+  const prog = document.getElementById('prog_' + currentIdx);
+  if (prog) prog.style.animationPlayState = 'running';
+  // Resume timer (approximate remaining)
+  timer = setTimeout(() => nextStatus(), 2000);
+});
+
+function handleReplyKey(e) {
+  if (e.key === 'Enter') sendReply();
+}
+
+async function sendReply() {
+  if (!currentUser) return;
+  const input = document.getElementById('replyInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const s = allStatuses[currentIdx];
+  // Send as DM
+  await sb.from('notifications').insert({
+    user_id: s.user_id, type: 'follow',
+    message: `💬 @${(await getCurrentProfile())?.username} membalas status kau: "${text}"`,
+    entity_type: 'status_reply'
+  });
+  input.value = '';
+  // Show toast feedback
+  const t = document.createElement('div');
+  t.textContent = '✅ Balasan dihantar!';
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.9);color:white;padding:10px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:999;animation:toastIn 0.3s ease';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+function closeStatus() {
+  clearTimeout(timer);
+  history.back();
+}
+
+init();
+</script>
+</body>
+</html>

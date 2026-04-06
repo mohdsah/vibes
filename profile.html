@@ -95,10 +95,22 @@
     <div class="loader"><div class="spinner"></div></div>
   </div>
 
-  <!-- ✅ FIX: Tabs with explicit IDs -->
+  <!-- STATUS STRIP -->
+  <div id="profileStatusStrip" style="padding:14px 16px 8px;border-bottom:1px solid #1e1e1e;display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px">Status Aktif</div>
+      <a href="status.html" style="font-size:12px;color:var(--accent);font-weight:600;text-decoration:none">+ Tambah</a>
+    </div>
+    <div id="profileStatusRow" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px"></div>
+  </div>
+
+  <!-- TABS -->
   <div class="tabs-row">
     <button class="tab-btn active" id="tabVideos" onclick="switchTab('videos')">☰</button>
     <button class="tab-btn" id="tabLiked" onclick="switchTab('liked')">❤️</button>
+    <button class="tab-btn" id="tabBookmarks" onclick="switchTab('bookmarks')">🔖</button>
+    <button class="tab-btn" id="tabHighlights" onclick="switchTab('highlights')">⭐</button>
+    <button class="tab-btn" id="tabAbout" onclick="switchTab('about')">👤</button>
   </div>
 
   <div class="video-grid" id="videoGrid">
@@ -154,6 +166,7 @@ async function init() {
   document.getElementById('topUsername').textContent = '@' + profile.username;
   renderHeader(profile);
   loadVideos(profile.id);
+  loadProfileStatus(profile.id);
 
   if (!isOwnProfile && currentUser) {
     const { data: f } = await sb.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', profile.id).maybeSingle();
@@ -180,27 +193,34 @@ function renderHeader(profile) {
     </div>
     <div class="profile-actions">
       ${isOwnProfile
-        ? `<button class="btn-edit" onclick="openEditModal()">Edit Profile</button>
-           <button class="btn-wallet" onclick="window.location.href='wallet.html'">💎 Wallet</button>`
-        : `<button class="btn-follow" id="followBtn" onclick="toggleFollow()">${isFollowing ? 'Following' : 'Follow'}</button><button class="btn-msg">Message</button>`}
+        ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+             <button class="btn-edit" onclick="openEditModal()">Edit Profile</button>
+             <button class="btn-wallet" onclick="window.location.href='wallet.html'">💎 Wallet</button>
+             <button class="btn-msg" onclick="shareProfile()" style="padding:8px 14px;font-size:13px">↗️ Share</button>
+           </div>`
+        : `<div style="display:flex;gap:8px;flex-wrap:wrap">
+             <button class="btn-follow" id="followBtn" onclick="toggleFollow()">${isFollowing ? 'Following' : 'Follow'}</button>
+             <button class="btn-msg" onclick="openDM()">💬 DM</button>
+             <button class="btn-msg" onclick="shareProfile()" style="padding:10px 14px">↗️</button>
+           </div>`}
     </div>`;
 
   // Load coins for own profile
   if (isOwnProfile) loadProfileCoins();
 }
 
-// ✅ FIX: switchTab uses explicit IDs
+// switchTab - 5 tabs
 function switchTab(tab) {
   activeTab = tab;
-  document.getElementById('tabVideos').classList.toggle('active', tab === 'videos');
-  document.getElementById('tabLiked').classList.toggle('active', tab === 'liked');
-
-  if (tab === 'liked') {
-    // ✅ FIX: Anyone can see own likes, others see public likes
-    loadLikedVideos();
-  } else {
-    loadVideos(viewingProfile.id);
-  }
+  ['videos','liked','bookmarks','highlights','about'].forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
+  });
+  document.getElementById('videoGrid').innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  if (tab === 'liked') loadLikedVideos();
+  else if (tab === 'bookmarks') loadBookmarks();
+  else if (tab === 'highlights') loadHighlights();
+  else if (tab === 'about') loadAbout();
+  else loadVideos(viewingProfile.id);
 }
 
 async function loadVideos(userId) {
@@ -230,6 +250,92 @@ function renderGrid(vids, type) {
       <div class="thumb-overlay"></div>
       <div class="thumb-stats">${type === 'liked' ? '❤️' : '▶'} ${formatCount(type === 'liked' ? v.likes_count : v.views_count)}</div>
     </div>`).join('');
+}
+
+async async function loadProfileStatus(userId) {
+  const { data } = await sb.from('status_posts')
+    .select('id, bg_color, emoji, type, image_url, content')
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (!data?.length) return;
+
+  const strip = document.getElementById('profileStatusStrip');
+  const row = document.getElementById('profileStatusRow');
+  strip.style.display = 'block';
+
+  row.innerHTML = data.map(s => {
+    let inner = '';
+    if (s.type === 'emoji') inner = `<div style="font-size:28px">${s.emoji}</div>`;
+    else if (s.type === 'image' && s.image_url) inner = `<img src="${s.image_url}" style="width:100%;height:100%;object-fit:cover"/>`;
+    else inner = `<div style="font-size:11px;font-weight:600;padding:4px;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${s.content||''}</div>`;
+    return `<div onclick="window.location.href='view-status.html?id=${s.id}'" style="flex-shrink:0;width:60px;height:60px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;cursor:pointer;background:${s.bg_color||'#111'};display:flex;align-items:center;justify-content:center">${inner}</div>`;
+  }).join('');
+}
+
+function shareProfile() {
+  const url = `${window.location.origin}/profile.html?id=${viewingProfile.id}`;
+  if (navigator.share) {
+    navigator.share({ title: `${viewingProfile.display_name||viewingProfile.username} on VIBES`, text: `Tengok profil @${viewingProfile.username} kat VIBES! 🔥`, url });
+  } else {
+    navigator.clipboard.writeText(url).then(() => {
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);color:white;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:999;white-space:nowrap';
+      t.textContent = '✅ Link profil disalin!'; document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2000);
+    });
+  }
+}
+
+async function openDM() {
+  if (!currentUser) return window.location.href = 'auth.html';
+  const { data } = await sb.rpc('get_or_create_conversation', { p_user1: currentUser.id, p_user2: viewingProfile.id });
+  window.location.href = data ? `dm-chat.html?conv=${data}&user=${viewingProfile.id}` : 'dm.html';
+}
+
+function loadBookmarks() {
+  const grid = document.getElementById('videoGrid');
+  if (!isOwnProfile) { grid.innerHTML = '<div class="empty-state"><div class="emoji">🔒</div><p>Bookmark peribadi</p></div>'; return; }
+  const { data } = await sb.from('bookmarks').select('videos(id,video_url,likes_count,views_count)').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  const vids = data?.map(d => d.videos).filter(Boolean) || [];
+  if (!vids.length) { grid.innerHTML = '<div class="empty-state"><div class="emoji">🔖</div><p>Tiada bookmark lagi</p></div>'; return; }
+  grid.innerHTML = vids.map(v => `<div class="video-thumb" onclick="window.location.href='video.html?id=${v.id}'"><video src="${v.video_url}" muted preload="metadata"></video><div class="thumb-overlay"></div><div class="thumb-stats">🔖 ${formatCount(v.views_count)}</div></div>`).join('');
+}
+
+async function loadHighlights() {
+  const grid = document.getElementById('videoGrid');
+  const { data } = await sb.from('profile_highlights').select('*, videos(id,video_url,likes_count,views_count)').eq('user_id', viewingProfile.id).order('sort_order', { ascending: true });
+  if (!data?.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><p>Tiada highlights lagi</p>${isOwnProfile ? '<p style="font-size:12px;color:#555;margin-top:4px">Tambah dari video kau</p>' : ''}</div>`;
+    return;
+  }
+  grid.innerHTML = data.map(h => `<div class="video-thumb" onclick="window.location.href='video.html?id=${h.video_id}'" style="position:relative"><video src="${h.videos?.video_url}" muted preload="metadata"></video><div class="thumb-overlay"></div><div style="position:absolute;bottom:0;left:0;right:0;padding:6px;font-size:11px;font-weight:700;background:rgba(0,0,0,0.6)">${h.title}</div></div>`).join('');
+}
+
+function loadAbout() {
+  const grid = document.getElementById('videoGrid');
+  const p = viewingProfile;
+  const joined = p.created_at ? new Date(p.created_at).toLocaleDateString('ms-MY', { year:'numeric', month:'long' }) : '—';
+  const rank = getDiletRank(p.total_coins_spent || 0);
+  grid.innerHTML = `<div style="grid-column:1/-1;padding:20px 4px">
+    ${p.bio ? `<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:14px"><div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Bio</div><div style="font-size:15px;line-height:1.5">${p.bio}</div></div>` : ''}
+    <div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">Maklumat</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Nama</span><span style="font-weight:600">${p.display_name||p.username}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Username</span><span style="font-weight:600">@${p.username}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Daftar</span><span style="font-weight:600">${joined}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Rank</span><span>${renderRankBadge(p.total_coins_spent||0)}</span></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="background:var(--surface);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:800">${formatCount(p.followers_count||0)}</div><div style="font-size:11px;color:var(--muted)">Followers</div></div>
+      <div style="background:var(--surface);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:800">${formatCount(p.following_count||0)}</div><div style="font-size:11px;color:var(--muted)">Following</div></div>
+      <div style="background:var(--surface);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:800">${formatCount(p.videos_count||0)}</div><div style="font-size:11px;color:var(--muted)">Videos</div></div>
+    </div>
+  </div>`;
 }
 
 function updateFollowBtn() {
@@ -343,13 +449,6 @@ function showOptions() {
 
   sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
   document.body.appendChild(sheet);
-}
-
-async function openDM() {
-  document.getElementById('optionsSheet')?.remove();
-  if (!currentUser) return window.location.href = 'auth.html';
-  const { data: convId } = await sb.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: viewingProfile.id });
-  window.location.href = `dm-chat.html?conv=${convId}&user=${viewingProfile.id}`;
 }
 
 async function reportUser() {

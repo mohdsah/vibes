@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>VIBES — Status</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <link rel="manifest" href="manifest.json"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--text:#f0f0f0;--muted:#666}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
+
+    .top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+    .back-btn{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer}
+    .top-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px}
+    .post-btn{background:var(--accent);border:none;border-radius:10px;color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;padding:9px 20px;cursor:pointer}
+    .post-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+    /* Preview */
+    .preview-card{margin:20px 16px;border-radius:20px;overflow:hidden;aspect-ratio:9/16;max-height:340px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.2s}
+    .preview-card:active{transform:scale(0.98)}
+    .preview-bg{position:absolute;inset:0;transition:background 0.3s}
+    .preview-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+    .preview-emoji{font-size:72px;position:relative;z-index:1;text-align:center;line-height:1;margin-bottom:12px}
+    .preview-text{font-size:22px;font-weight:700;text-align:center;padding:0 20px;position:relative;z-index:1;line-height:1.3;word-break:break-word;white-space:pre-wrap}
+    .preview-expire{position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:11px;opacity:0.6;z-index:2}
+
+    /* Type tabs */
+    .type-tabs{display:flex;gap:8px;padding:0 16px;margin-bottom:20px;overflow-x:auto}
+    .type-tabs::-webkit-scrollbar{display:none}
+    .type-tab{flex-shrink:0;padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);transition:all 0.15s}
+    .type-tab.active{background:var(--accent);border-color:var(--accent);color:white}
+
+    /* Content input */
+    .section{padding:0 16px;margin-bottom:20px}
+    .section-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+    textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;resize:none;transition:border-color 0.2s;min-height:100px}
+    textarea:focus{border-color:var(--accent)}
+    textarea::placeholder{color:var(--muted)}
+
+    /* Emoji picker */
+    .emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:8px}
+    .emoji-btn{font-size:26px;padding:6px;border:none;background:none;cursor:pointer;border-radius:8px;transition:background 0.15s}
+    .emoji-btn:hover{background:var(--surface)}
+    .emoji-btn.active{background:rgba(255,45,85,0.15);outline:2px solid var(--accent);border-radius:8px}
+
+    /* Color picker */
+    .color-row{display:flex;gap:8px;flex-wrap:wrap}
+    .color-dot{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s;flex-shrink:0}
+    .color-dot.active{border-color:white;transform:scale(1.15)}
+
+    /* Image upload */
+    .img-upload{border:2px dashed var(--border);border-radius:14px;padding:24px;text-align:center;cursor:pointer;position:relative;transition:border-color 0.2s}
+    .img-upload:hover{border-color:var(--accent)}
+    .img-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+
+    /* My status section */
+    .my-status-section{padding:0 16px;margin-bottom:20px}
+    .status-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+    .status-strip::-webkit-scrollbar{display:none}
+    .status-item{flex-shrink:0;width:64px;cursor:pointer;text-align:center}
+    .status-avatar-ring{width:60px;height:60px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;margin:0 auto 4px;position:relative}
+    .status-avatar-ring.viewed{border-color:#555}
+    .status-avatar-ring img{width:100%;height:100%;object-fit:cover}
+    .status-username{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .add-status-btn{width:60px;height:60px;border-radius:50%;background:var(--surface);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;flex-shrink:0;margin:0 auto 4px}
+
+    /* Toast */
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid #333;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;color:white;z-index:999;display:none;white-space:nowrap}
+    .toast.show{display:block;animation:toastIn 0.3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+    .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <span class="top-title">📸 STATUS</span>
+  <button class="post-btn" id="postBtn" onclick="postStatus()" disabled>Post</button>
+</div>
+
+<!-- Preview -->
+<div class="preview-card" id="previewCard">
+  <div class="preview-bg" id="previewBg"></div>
+  <img class="preview-img" id="previewImg"/>
+  <div>
+    <div class="preview-emoji" id="previewEmoji"></div>
+    <div class="preview-text" id="previewText" style="color:#ffffff">Apa yang kau rasa hari ni?</div>
+  </div>
+  <div class="preview-expire">⏱ Hilang dalam 24 jam</div>
+</div>
+
+<!-- Type tabs -->
+<div class="type-tabs">
+  <div class="type-tab active" id="type_text" onclick="setType('text')">✏️ Teks</div>
+  <div class="type-tab" id="type_emoji" onclick="setType('emoji')">😊 Emoji</div>
+  <div class="type-tab" id="type_image" onclick="setType('image')">🖼️ Gambar</div>
+</div>
+
+<!-- Text section -->
+<div class="section" id="sec_text">
+  <div class="section-label">Tulis Status</div>
+  <textarea id="statusText" placeholder="Apa yang kau fikir hari ni? 💭" maxlength="200" oninput="updatePreview()"></textarea>
+  <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px"><span id="charCount">0</span>/200</div>
+</div>
+
+<!-- Emoji section -->
+<div class="section" id="sec_emoji" style="display:none">
+  <div class="section-label">Pilih Emoji</div>
+  <div class="emoji-grid" id="emojiGrid"></div>
+</div>
+
+<!-- Image section -->
+<div class="section" id="sec_image" style="display:none">
+  <div class="section-label">Upload Gambar</div>
+  <div class="img-upload">
+    <input type="file" accept="image/*" onchange="previewImage(this)"/>
+    <div style="font-size:32px;margin-bottom:8px">🖼️</div>
+    <div style="font-size:14px;color:var(--muted)" id="imgText">Tap untuk pilih gambar</div>
+  </div>
+  <div style="margin-top:12px">
+    <div class="section-label">Caption (Optional)</div>
+    <textarea id="imgCaption" placeholder="Tambah caption..." maxlength="100" rows="2" oninput="updatePreview()"></textarea>
+  </div>
+</div>
+
+<!-- Background color -->
+<div class="section" id="sec_bgColor">
+  <div class="section-label">Warna Background</div>
+  <div class="color-row" id="colorRow"></div>
+</div>
+
+<!-- Text color (for text type) -->
+<div class="section" id="sec_textColor">
+  <div class="section-label">Warna Teks</div>
+  <div class="color-row" id="textColorRow"></div>
+</div>
+
+<!-- My status strip -->
+<div class="my-status-section">
+  <div class="section-label" style="margin-bottom:12px">Status Kau & Rakan 👁</div>
+  <div class="status-strip" id="statusStrip"><div class="spinner"></div></div>
+</div>
+
+<script>
+let currentUser = null, currentProfile = null;
+let statusType = 'text';
+let selectedBg = '#1a1a2e';
+let selectedTextColor = '#ffffff';
+let selectedEmoji = '';
+let imageFile = null;
+let imageUrl = null;
+
+const BG_COLORS = [
+  '#1a1a2e','#16213e','#0f3460','#1a0a1e',
+  '#1a1a1a','#0d1117','#1e1005','#051a05',
+  'linear-gradient(135deg,#ff2d55,#ff6b35)',
+  'linear-gradient(135deg,#a855f7,#3b82f6)',
+  'linear-gradient(135deg,#22c55e,#0d9488)',
+  'linear-gradient(135deg,#ffd700,#ff9500)',
+  'linear-gradient(135deg,#111,#333)',
+  'linear-gradient(135deg,#1a0a30,#0a1a40)',
+];
+
+const TEXT_COLORS = ['#ffffff','#ffd700','#ff2d55','#22c55e','#60a5fa','#f97316','#a855f7','#000000'];
+
+const EMOJIS = ['😊','😍','🥰','😂','🤣','😭','😤','🥺','😎','🤩','😴','🤔','💀','🔥','💯','❤️','💎','🎉','🎵','⚡','🌙','🌈','🍀','✨'];
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  currentProfile = await getCurrentProfile();
+
+  renderColorPicker();
+  renderTextColors();
+  renderEmojiGrid();
+  updatePreview();
+  loadStatusStrip();
+}
+
+function renderColorPicker() {
+  document.getElementById('colorRow').innerHTML = BG_COLORS.map((c, i) => `
+    <div class="color-dot ${i===0?'active':''}" style="background:${c}" onclick="selectBg('${c}', this)"></div>`).join('');
+}
+
+function renderTextColors() {
+  document.getElementById('textColorRow').innerHTML = TEXT_COLORS.map((c, i) => `
+    <div class="color-dot ${i===0?'active':''}" style="background:${c};border:2px solid #333" onclick="selectTextColor('${c}', this)"></div>`).join('');
+}
+
+function renderEmojiGrid() {
+  document.getElementById('emojiGrid').innerHTML = EMOJIS.map(e => `
+    <button class="emoji-btn" onclick="selectEmoji('${e}', this)">${e}</button>`).join('');
+}
+
+function setType(type) {
+  statusType = type;
+  document.querySelectorAll('.type-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('type_' + type).classList.add('active');
+  document.getElementById('sec_text').style.display = type === 'text' ? 'block' : 'none';
+  document.getElementById('sec_emoji').style.display = type === 'emoji' ? 'block' : 'none';
+  document.getElementById('sec_image').style.display = type === 'image' ? 'block' : 'none';
+  document.getElementById('sec_textColor').style.display = type !== 'image' ? 'block' : 'none';
+  updatePreview();
+  checkPostBtn();
+}
+
+function selectBg(color, el) {
+  selectedBg = color;
+  document.querySelectorAll('#colorRow .color-dot').forEach(d => d.classList.remove('active'));
+  el.classList.add('active');
+  updatePreview();
+}
+
+function selectTextColor(color, el) {
+  selectedTextColor = color;
+  document.querySelectorAll('#textColorRow .color-dot').forEach(d => d.classList.remove('active'));
+  el.classList.add('active');
+  updatePreview();
+}
+
+function selectEmoji(emoji, el) {
+  selectedEmoji = emoji;
+  document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  updatePreview();
+  checkPostBtn();
+}
+
+function previewImage(input) {
+  imageFile = input.files[0];
+  if (!imageFile) return;
+  imageUrl = URL.createObjectURL(imageFile);
+  document.getElementById('imgText').textContent = '✅ ' + imageFile.name;
+  updatePreview();
+  checkPostBtn();
+}
+
+function updatePreview() {
+  const card = document.getElementById('previewCard');
+  const bg = document.getElementById('previewBg');
+  const img = document.getElementById('previewImg');
+  const emojiEl = document.getElementById('previewEmoji');
+  const textEl = document.getElementById('previewText');
+
+  // Background
+  if (selectedBg.startsWith('linear') || selectedBg.startsWith('#')) {
+    bg.style.background = selectedBg;
+  }
+
+  if (statusType === 'text') {
+    img.style.display = 'none';
+    const text = document.getElementById('statusText').value || 'Apa yang kau rasa hari ni?';
+    emojiEl.textContent = '';
+    textEl.textContent = text;
+    textEl.style.color = selectedTextColor;
+    textEl.style.fontSize = text.length > 80 ? '16px' : text.length > 40 ? '20px' : '26px';
+    document.getElementById('charCount').textContent = document.getElementById('statusText').value.length;
+  } else if (statusType === 'emoji') {
+    img.style.display = 'none';
+    emojiEl.textContent = selectedEmoji || '😊';
+    textEl.textContent = '';
+  } else if (statusType === 'image') {
+    if (imageUrl) {
+      img.style.display = 'block';
+      img.src = imageUrl;
+    }
+    const cap = document.getElementById('imgCaption')?.value || '';
+    emojiEl.textContent = '';
+    textEl.textContent = cap;
+    textEl.style.color = selectedTextColor;
+  }
+}
+
+function checkPostBtn() {
+  const btn = document.getElementById('postBtn');
+  if (statusType === 'text') btn.disabled = !document.getElementById('statusText').value.trim();
+  else if (statusType === 'emoji') btn.disabled = !selectedEmoji;
+  else if (statusType === 'image') btn.disabled = !imageFile;
+}
+
+// Listen for text input changes for post btn
+document.getElementById('statusText').addEventListener('input', checkPostBtn);
+
+async function postStatus() {
+  const btn = document.getElementById('postBtn');
+  btn.disabled = true; btn.textContent = 'Posting...';
+
+  try {
+    let finalImageUrl = null;
+
+    if (statusType === 'image' && imageFile) {
+      const ext = imageFile.name.split('.').pop();
+      const path = `status/${currentUser.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(path, imageFile, { upsert: true });
+      if (!upErr) {
+        const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path);
+        finalImageUrl = publicUrl;
+      }
+    }
+
+    const payload = {
+      user_id: currentUser.id,
+      type: statusType,
+      bg_color: selectedBg,
+      text_color: selectedTextColor,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    };
+
+    if (statusType === 'text') payload.content = document.getElementById('statusText').value.trim();
+    else if (statusType === 'emoji') payload.emoji = selectedEmoji;
+    else if (statusType === 'image') {
+      payload.image_url = finalImageUrl;
+      payload.content = document.getElementById('imgCaption')?.value?.trim() || '';
+    }
+
+    const { error } = await sb.from('status_posts').insert(payload);
+    if (error) throw error;
+
+    showToast('✅ Status dipost! Hilang dalam 24 jam.');
+    setTimeout(() => history.back(), 1500);
+
+  } catch(e) {
+    showToast('❌ Gagal: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Post';
+  }
+}
+
+async function loadStatusStrip() {
+  const strip = document.getElementById('statusStrip');
+  const expiry = new Date().toISOString();
+
+  // Get following list
+  const { data: follows } = await sb.from('follows')
+    .select('following_id').eq('follower_id', currentUser.id);
+  const ids = follows?.map(f => f.following_id) || [];
+  ids.push(currentUser.id);
+
+  const { data: statuses } = await sb.from('status_posts')
+    .select('*, profiles(id, username, avatar_url)')
+    .in('user_id', ids)
+    .gt('expires_at', expiry)
+    .order('created_at', { ascending: false });
+
+  // Group by user — latest status per user
+  const userMap = {};
+  statuses?.forEach(s => {
+    if (!userMap[s.user_id]) userMap[s.user_id] = s;
+  });
+
+  const items = Object.values(userMap);
+
+  if (!items.length) {
+    strip.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:10px 0">Tiada status dari rakan kau</div>`;
+    return;
+  }
+
+  strip.innerHTML = items.map(s => {
+    const isMine = s.user_id === currentUser.id;
+    return `<div class="status-item" onclick="viewStatus('${s.id}')">
+      <div class="status-avatar-ring">
+        <img src="${getAvatarUrl(s.profiles)}" alt="${s.profiles?.username}" />
+      </div>
+      <div class="status-username">${isMine ? 'Kau' : '@' + s.profiles?.username}</div>
+    </div>`;
+  }).join('');
+}
+
+function viewStatus(id) {
+  window.location.href = `view-status.html?id=${id}`;
+}
+
+init();
+</script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

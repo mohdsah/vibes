@@ -128,6 +128,8 @@
   <div class="nav-item" id="nav_users" onclick="switchPage('users')"><span class="nav-icon">👥</span> Users</div>
   <div class="nav-item" id="nav_videos" onclick="switchPage('videos')"><span class="nav-icon">🎬</span> Videos</div>
   <div class="nav-item" id="nav_lives" onclick="switchPage('lives')"><span class="nav-icon">🔴</span> Live Rooms</div>
+  <div class="nav-item" id="nav_status" onclick="switchPage('status')"><span class="nav-icon">📸</span> Status Posts</div>
+  <div class="nav-item" id="nav_packages" onclick="switchPage('packages')"><span class="nav-icon">📦</span> Coin Packages</div>
   <div class="nav-item" id="nav_reports" onclick="switchPage('reports')"><span class="nav-icon">🚩</span> Reports <span class="nav-badge" id="reportBadge">0</span></div>
   <div class="nav-item" id="nav_broadcast" onclick="switchPage('broadcast')"><span class="nav-icon">📢</span> Broadcast</div>
   <div class="nav-item" id="nav_revenue" onclick="switchPage('revenue')"><span class="nav-icon">💰</span> Revenue</div>
@@ -237,12 +239,26 @@
   <!-- ── LIVES ──────────────────────────── -->
   <div class="page-section" id="sec_lives">
     <div class="page-header">
-      <div><div class="page-title">🔴 Live Rooms</div><div class="page-sub">Sejarah semua live stream</div></div>
-      <button class="btn-approve" onclick="forceEndAllLives()" style="padding:8px 16px">⛔ End All Lives</button>
+      <div><div class="page-title">🔴 Live Rooms</div><div class="page-sub">History semua live</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-approve" onclick="switchLiveAdminTab('video')" id="ladmin_video" style="padding:8px 14px">📹 Video</button>
+        <button class="btn-view" onclick="switchLiveAdminTab('text')" id="ladmin_text" style="padding:8px 14px">💬 Kotak</button>
+        <button class="btn-reject" onclick="forceEndAllLives()" style="padding:8px 14px">⛔ End All</button>
+      </div>
     </div>
     <div class="content">
       <div class="table-card">
         <div id="livesTable"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATUS POSTS ───────────────────── -->
+  <div class="page-section" id="sec_status">
+    <div class="page-header"><div><div class="page-title">📸 Status Posts</div><div class="page-sub">Status 24 jam pengguna</div></div></div>
+    <div class="content">
+      <div class="table-card">
+        <div id="statusTable"><div class="spinner"></div></div>
       </div>
     </div>
   </div>
@@ -328,6 +344,57 @@
       </div>
     </div>
   </div>
+
+  <!-- ── COIN PACKAGES ─────────────────── -->
+  <div class="page-section" id="sec_packages">
+    <div class="page-header">
+      <div><div class="page-title">📦 Coin Packages</div><div class="page-sub">Urus pakej top up coins</div></div>
+      <button class="btn-approve" onclick="openPkgModal()" style="padding:8px 16px">+ Tambah Pakej</button>
+    </div>
+    <div class="content">
+      <div class="table-card" id="packagesTable"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Package Modal -->
+<div class="reject-modal" id="pkgModal">
+  <div class="reject-card" style="max-width:420px;width:100%">
+    <div class="reject-title" id="pkgModalTitle">Tambah Pakej Baru</div>
+    <input type="hidden" id="pkgId"/>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+      <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Nama Pakej</label>
+        <input type="text" id="pkgName" placeholder="Contoh: Starter Pack" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Coins</label>
+          <input type="number" id="pkgCoins" placeholder="100" min="1" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Bonus Coins</label>
+          <input type="number" id="pkgBonus" placeholder="0" min="0" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Harga (RM)</label>
+        <input type="number" id="pkgPrice" step="0.50" placeholder="5.00" min="0.50" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:4px 0">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="pkgPopular" style="width:18px;height:18px;cursor:pointer"/> Popular ⭐
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="pkgActive" checked style="width:18px;height:18px;cursor:pointer"/> Aktif
+        </label>
+      </div>
+    </div>
+    <div class="reject-btns">
+      <button class="btn-cancel-r" onclick="closePkgModal()">Batal</button>
+      <button class="btn-confirm-r" onclick="savePkg()" id="pkgSaveBtn">Simpan</button>
+    </div>
+  </div>
 </div>
 
 <!-- REJECT MODAL -->
@@ -373,26 +440,139 @@ async function init() {
 function switchPage(page) {
   document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('sec_' + page).classList.add('active');
-  document.getElementById('nav_' + page).classList.add('active');
-  if (page === 'topups') loadTopups();
-  else if (page === 'withdraws') loadWithdraws();
-  else if (page === 'users') loadUsers();
-  else if (page === 'videos') loadVideos();
-  else if (page === 'lives') loadLives();
-  else if (page === 'reports') loadReports();
-  else if (page === 'broadcast') { loadBroadcastHistory(); }
-  else if (page === 'revenue') loadRevenue();
-  else if (page === 'dashboard') loadDashboard();
+  document.getElementById('sec_' + page)?.classList.add('active');
+  document.getElementById('nav_' + page)?.classList.add('active');
+  const map = {
+    topups: loadTopups, withdraws: loadWithdraws, users: loadUsers,
+    videos: loadVideos, lives: loadLives, reports: loadReports,
+    broadcast: loadBroadcastHistory, revenue: loadRevenue,
+    dashboard: loadDashboard, status: loadStatusAdmin,
+    packages: loadPackages
+  };
+  map[page]?.();
+}
+
+// ── LIVE ADMIN TABS ───────────────────────────
+let liveAdminTab = 'video';
+function switchLiveAdminTab(tab) {
+  liveAdminTab = tab;
+  document.getElementById('ladmin_video').className = tab==='video' ? 'btn-approve' : 'btn-view';
+  document.getElementById('ladmin_text').className  = tab==='text'  ? 'btn-approve' : 'btn-view';
+  loadLives();
+}
+
+async function loadLives() {
+  document.getElementById('livesTable').innerHTML = '<div class="spinner"></div>';
+  if (liveAdminTab === 'video') await loadVideoLives();
+  else await loadTextLives();
+}
+
+async function loadVideoLives() {
+  const { data } = await sb.from('live_rooms')
+    .select('*, profiles(username,display_name)')
+    .order('started_at', { ascending: false }).limit(50);
+  const el = document.getElementById('livesTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada live video</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Host</th><th>Tajuk</th><th>Viewers</th><th>Status</th><th>Masa</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(r => `<tr>
+      <td>@${r.profiles?.username||'—'}</td>
+      <td>${r.title||'—'}</td>
+      <td>👁 ${r.viewer_count||0}</td>
+      <td><span class="badge ${r.status==='live'?'badge-active':'badge-rejected'}">${r.status}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${timeAgo(r.started_at)}</td>
+      <td><div class="action-btns">
+        ${r.status==='live'?`<button class="btn-reject" onclick="endLiveAdmin('${r.id}','video')">⛔ End</button>`:''}
+        <button class="btn-reject" onclick="deleteLiveAdmin('${r.id}','video')" style="background:rgba(100,0,0,0.2)">🗑️</button>
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function loadTextLives() {
+  const { data } = await sb.from('live_text_rooms')
+    .select('*, profiles(username,display_name)')
+    .order('started_at', { ascending: false }).limit(50);
+  const el = document.getElementById('livesTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada live kotak</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Host</th><th>Tajuk</th><th>Topik</th><th>Status</th><th>Masa</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(r => `<tr>
+      <td>@${r.profiles?.username||'—'}</td>
+      <td>${r.bg_emoji||'💬'} ${r.title}</td>
+      <td style="color:var(--muted);font-size:12px">${r.topic||'—'}</td>
+      <td><span class="badge ${r.status==='live'?'badge-active':'badge-rejected'}">${r.status}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${timeAgo(r.started_at)}</td>
+      <td><div class="action-btns">
+        ${r.status==='live'?`<button class="btn-reject" onclick="endLiveAdmin('${r.id}','text')">⛔ End</button>`:''}
+        <button class="btn-reject" onclick="deleteLiveAdmin('${r.id}','text')" style="background:rgba(100,0,0,0.2)">🗑️</button>
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function endLiveAdmin(id, type) {
+  if (!confirm('Tamatkan live ini?')) return;
+  const table = type === 'text' ? 'live_text_rooms' : 'live_rooms';
+  await sb.from(table).update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+  showToastAdmin('⛔ Live ditamatkan');
+  loadLives();
+}
+
+async function deleteLiveAdmin(id, type) {
+  if (!confirm('Padam rekod live ini? Tidak boleh undo.')) return;
+  const table = type === 'text' ? 'live_text_rooms' : 'live_rooms';
+  if (type === 'text') await sb.from('live_text_messages').delete().eq('room_id', id);
+  await sb.from(table).delete().eq('id', id);
+  showToastAdmin('🗑️ Live dipadam');
+  loadLives();
+}
+
+// ── STATUS ADMIN ──────────────────────────────
+async function loadStatusAdmin() {
+  document.getElementById('statusTable').innerHTML = '<div class="spinner"></div>';
+  const { data } = await sb.from('status_posts')
+    .select('*, profiles(username, avatar_url)')
+    .order('created_at', { ascending: false }).limit(100);
+  const el = document.getElementById('statusTable');
+  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada status</div>'; return; }
+  const now = new Date();
+  el.innerHTML = `<table>
+    <thead><tr><th>User</th><th>Jenis</th><th>Kandungan</th><th>Views</th><th>Status</th><th>Tamat</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(s => {
+      const expired = new Date(s.expires_at) < now;
+      const content = s.type === 'emoji' ? s.emoji : s.type === 'image' ? '🖼️ Gambar' : (s.content?.substring(0,40)||'—') + (s.content?.length>40?'...':'');
+      return `<tr>
+        <td><div class="user-cell"><img src="${getAvatarUrl(s.profiles)}" /><div class="user-cell-name">@${s.profiles?.username}</div></div></td>
+        <td>${s.type==='emoji'?'😊':s.type==='image'?'🖼️':'✏️'} ${s.type}</td>
+        <td style="font-size:13px">${content}</td>
+        <td>👁 ${s.views_count||0}</td>
+        <td><span class="badge ${expired?'badge-rejected':'badge-active'}">${expired?'Tamat':'Aktif'}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${timeAgo(s.expires_at)}</td>
+        <td><button class="btn-reject" onclick="deleteStatus('${s.id}')">🗑️</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+async function deleteStatus(id) {
+  if (!confirm('Padam status ini?')) return;
+  await sb.from('status_views').delete().eq('status_id', id);
+  await sb.from('status_posts').delete().eq('id', id);
+  showToastAdmin('🗑️ Status dipadam');
+  loadStatusAdmin();
 }
 
 async function loadBadges() {
-  const [{ count: tc }, { count: wc }] = await Promise.all([
+  const [{ count: tc }, { count: wc }, { count: rc }] = await Promise.all([
     sb.from('topup_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    sb.from('withdraw_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+    sb.from('withdraw_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    sb.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending')
   ]);
   document.getElementById('topupBadge').textContent = tc || 0;
   document.getElementById('withdrawBadge').textContent = wc || 0;
+  const rb = document.getElementById('reportBadge');
+  if (rb) rb.textContent = rc || 0;
 }
 
 async function loadDashboard() {
@@ -607,25 +787,6 @@ async function deleteVideo(id) {
   loadVideos();
 }
 
-// ── LIVES ─────────────────────────────────
-async function loadLives() {
-  const { data } = await sb.from('live_rooms').select('*, profiles(username,display_name)').order('started_at', { ascending: false }).limit(50);
-  const el = document.getElementById('livesTable');
-  if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Tiada live room</div>'; return; }
-  el.innerHTML = `<table>
-    <thead><tr><th>Host</th><th>Tajuk</th><th>Status</th><th>Viewers</th><th>Coins</th><th>Mula</th></tr></thead>
-    <tbody>${data.map(r => `
-      <tr>
-        <td>@${r.profiles?.username||'—'}</td>
-        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td>
-        <td><span class="badge ${r.status==='live'?'badge-active':'badge-rejected'}">${r.status}</span></td>
-        <td>${r.viewer_count||0}</td>
-        <td style="color:var(--gold)">💎 ${r.total_coins_earned||0}</td>
-        <td style="font-size:12px">${timeAgo(r.started_at)}</td>
-      </tr>`).join('')}
-    </tbody></table>`;
-}
-
 // ── HELPERS ───────────────────────────────
 function viewReceipt(url) { document.getElementById('receiptFullImg').src = url; document.getElementById('receiptModal').classList.add('show'); }
 function closeReceipt() { document.getElementById('receiptModal').classList.remove('show'); }
@@ -638,13 +799,108 @@ function showToastAdmin(msg) {
   setTimeout(() => t.remove(), 2500);
 }
 
-// ── FORCE END ALL LIVES ──────────────────────
-async function forceEndAllLives() {
-  if (!confirm('End SEMUA live stream aktif sekarang?')) return;
-  const { data, error } = await sb.from('live_rooms')
-    .update({ status: 'ended', ended_at: new Date().toISOString(), viewer_count: 0 })
-    .eq('status', 'live');
+// ── COIN PACKAGES ────────────────────────────
+async function loadPackages() {
+  document.getElementById('packagesTable').innerHTML = '<div class="spinner"></div>';
+  const { data } = await sb.from('coin_packages').select('*').order('price_myr');
+  const el = document.getElementById('packagesTable');
+  if (!data?.length) {
+    el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--muted)">Tiada pakej. <button class="table-action" onclick="openPkgModal()">Tambah sekarang →</button></div>`;
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Nama</th><th>Coins</th><th>Bonus</th><th>Harga</th><th>Status</th><th>Tindakan</th></tr></thead>
+    <tbody>${data.map(p => `
+      <tr>
+        <td style="font-weight:700">${p.name}</td>
+        <td style="color:var(--gold)">💎 ${p.coins.toLocaleString()}</td>
+        <td style="color:var(--green)">${p.bonus_coins > 0 ? `+${p.bonus_coins}` : '—'}</td>
+        <td style="font-weight:700">RM ${Number(p.price_myr).toFixed(2)}</td>
+        <td>
+          ${p.is_popular ? '<span class="badge badge-active" style="margin-right:4px">⭐ Popular</span>' : ''}
+          <span class="badge ${p.is_active ? 'badge-approved' : 'badge-rejected'}">${p.is_active ? 'Aktif' : 'Nyahaktif'}</span>
+        </td>
+        <td><div class="action-btns">
+          <button class="btn-approve" onclick="editPkg(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️ Edit</button>
+          <button class="btn-view" onclick="togglePkgActive('${p.id}',${p.is_active})">${p.is_active ? 'Disable' : 'Enable'}</button>
+          <button class="btn-reject" onclick="deletePkg('${p.id}','${p.name}')">🗑️</button>
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function openPkgModal(pkg = null) {
+  document.getElementById('pkgModalTitle').textContent = pkg ? 'Edit Pakej' : 'Tambah Pakej Baru';
+  document.getElementById('pkgId').value = pkg?.id || '';
+  document.getElementById('pkgName').value = pkg?.name || '';
+  document.getElementById('pkgCoins').value = pkg?.coins || '';
+  document.getElementById('pkgBonus').value = pkg?.bonus_coins || 0;
+  document.getElementById('pkgPrice').value = pkg?.price_myr || '';
+  document.getElementById('pkgPopular').checked = pkg?.is_popular || false;
+  document.getElementById('pkgActive').checked = pkg?.is_active ?? true;
+  document.getElementById('pkgModal').classList.add('show');
+}
+
+function editPkg(pkgObj) {
+  // pkgObj is already a JS object from the onclick
+  try {
+    openPkgModal(typeof pkgObj === 'string' ? JSON.parse(pkgObj) : pkgObj);
+  } catch(e) { openPkgModal(); }
+}
+
+function closePkgModal() {
+  document.getElementById('pkgModal').classList.remove('show');
+}
+
+async function savePkg() {
+  const id = document.getElementById('pkgId').value;
+  const name = document.getElementById('pkgName').value.trim();
+  const coins = parseInt(document.getElementById('pkgCoins').value);
+  const bonus = parseInt(document.getElementById('pkgBonus').value) || 0;
+  const price = parseFloat(document.getElementById('pkgPrice').value);
+  const popular = document.getElementById('pkgPopular').checked;
+  const active = document.getElementById('pkgActive').checked;
+
+  if (!name || !coins || !price) { showToastAdmin('❌ Isi semua medan wajib!'); return; }
+
+  const btn = document.getElementById('pkgSaveBtn');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  const payload = { name, coins, bonus_coins: bonus, price_myr: price, is_popular: popular, is_active: active };
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('coin_packages').update(payload).eq('id', id));
+  } else {
+    ({ error } = await sb.from('coin_packages').insert(payload));
+  }
+
+  btn.disabled = false; btn.textContent = 'Simpan';
+
   if (error) { showToastAdmin('❌ Error: ' + error.message); return; }
+  showToastAdmin(id ? '✅ Pakej dikemas kini!' : '✅ Pakej baru ditambah!');
+  closePkgModal();
+  loadPackages();
+}
+
+async function togglePkgActive(id, currentState) {
+  await sb.from('coin_packages').update({ is_active: !currentState }).eq('id', id);
+  showToastAdmin(currentState ? '⏸ Pakej dinyahaktifkan' : '▶️ Pakej diaktifkan');
+  loadPackages();
+}
+
+async function deletePkg(id, name) {
+  if (!confirm(`Padam pakej "${name}"? Tidak boleh undo.`)) return;
+  await sb.from('coin_packages').delete().eq('id', id);
+  showToastAdmin('🗑️ Pakej dipadam');
+  loadPackages();
+}
+async function forceEndAllLives() {
+  if (!confirm('End SEMUA live stream (video + kotak) aktif sekarang?')) return;
+  await Promise.all([
+    sb.from('live_rooms').update({ status:'ended', ended_at: new Date().toISOString(), viewer_count:0 }).eq('status','live'),
+    sb.from('live_text_rooms').update({ status:'ended', ended_at: new Date().toISOString() }).eq('status','live')
+  ]);
   showToastAdmin('⛔ Semua live telah ditamatkan!');
   loadLives();
 }

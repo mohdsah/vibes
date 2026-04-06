@@ -26,6 +26,7 @@
 
     .feed { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; -webkit-overflow-scrolling: touch; }
     .feed::-webkit-scrollbar { display: none; }
+    .feed.has-status { padding-top: 88px; } /* push down when status strip shown */
 
     .video-item { height: 100vh; scroll-snap-align: start; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
     video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; cursor: pointer; }
@@ -62,6 +63,18 @@
     /* Live button pulse in nav */
     #liveNavBtn { animation: liveBtnPulse 2.5s ease-in-out infinite; }
     @keyframes liveBtnPulse { 0%,100%{ opacity:1 } 50%{ opacity:0.6 } }
+
+    /* ── STATUS STRIP ────────────────────── */
+    .status-strip-wrap{padding:12px 16px 0;padding-top:calc(var(--nav-h) + 12px);background:var(--bg);border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0}
+    .status-section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+    .status-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px}
+    .status-row::-webkit-scrollbar{display:none}
+    .s-item{flex-shrink:0;width:64px;text-align:center;cursor:pointer}
+    .s-ring{width:58px;height:58px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;margin:0 auto 4px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:24px}
+    .s-ring.seen{border-color:#333}
+    .s-ring img{width:100%;height:100%;object-fit:cover}
+    .s-add{border:2px dashed #333!important;background:rgba(255,255,255,0.04)!important}
+    .s-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;margin:0 auto}
 
     /* ── WATCH EARN TOAST ────────────────── */
     .earn-toast {
@@ -140,6 +153,16 @@
   <div class="loader"><div class="spinner"></div><p>Loading vibes...</p></div>
 </main>
 
+<!-- STATUS STRIP — di atas feed, bukan dalam scroll -->
+<div class="status-strip-wrap" id="statusStripWrap" style="display:none;position:fixed;top:var(--nav-h);left:0;right:0;z-index:90;padding-top:0">
+  <div class="status-row" id="statusRow">
+    <div class="s-item" onclick="window.location.href='status.html'">
+      <div class="s-ring s-add">＋</div>
+      <div class="s-name">Status</div>
+    </div>
+  </div>
+</div>
+
 <nav class="bottom-nav">
   <a class="bottom-tab active" href="index.html">🏠<span>Home</span></a>
   <a class="bottom-tab" href="search.html">🔍<span>Discover</span></a>
@@ -188,9 +211,51 @@ async function init() {
     currentProfile = await getCurrentProfile();
     loadUnreadCount();
     await loadTodayEarnCount();
+    loadStatusStrip(); // load status strip async, don't block feed
   }
   await loadVideos();
   setupIntersectionObserver();
+}
+
+function skipToFeed() {
+  document.getElementById('feed').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function loadStatusStrip() {
+  if (!currentUser) return;
+  const expiry = new Date().toISOString();
+  const { data: follows } = await sb.from('follows').select('following_id').eq('follower_id', currentUser.id);
+  const ids = (follows?.map(f => f.following_id) || []);
+  ids.push(currentUser.id);
+
+  const { data: statuses } = await sb.from('status_posts')
+    .select('id, user_id, bg_color, emoji, type, image_url, profiles(id, username, avatar_url)')
+    .in('user_id', ids).gt('expires_at', expiry)
+    .order('created_at', { ascending: false });
+
+  const seen = {}, unique = [];
+  statuses?.forEach(s => { if (!seen[s.user_id]) { seen[s.user_id] = true; unique.push(s); } });
+
+  const row = document.getElementById('statusRow');
+  const addBtn = `<div class="s-item" onclick="window.location.href='status.html'"><div class="s-ring s-add">＋</div><div class="s-name">Status</div></div>`;
+
+  if (!unique.length) {
+    row.innerHTML = addBtn;
+  } else {
+    const items = unique.map(s => {
+      const isMine = s.user_id === currentUser.id;
+      let inner = '';
+      if (s.type === 'emoji' && s.emoji) inner = `<div style="font-size:22px">${s.emoji}</div>`;
+      else if (s.type === 'image' && s.image_url) inner = `<img src="${s.image_url}" style="width:100%;height:100%;object-fit:cover" alt=""/>`;
+      else inner = `<img src="${getAvatarUrl(s.profiles)}" style="width:100%;height:100%;object-fit:cover" alt=""/>`;
+      return `<div class="s-item" onclick="window.location.href='view-status.html?id=${s.id}'"><div class="s-ring" style="background:${s.bg_color||'#111'}">${inner}</div><div class="s-name">${isMine?'Kau':'@'+s.profiles?.username}</div></div>`;
+    }).join('');
+    row.innerHTML = addBtn + items;
+  }
+
+  // Show strip + offset feed
+  document.getElementById('statusStripWrap').style.display = 'block';
+  document.getElementById('feed').classList.add('has-status');
 }
 
 async function loadTodayEarnCount() {

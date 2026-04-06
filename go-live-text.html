@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>VIBES — Live Text</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#ff2d55;--text:#f0f0f0;--muted:#555;--gold:#ffd700}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;display:flex;flex-direction:column}
+
+    /* Setup screen */
+    #setupScreen{flex:1;padding:20px;padding-top:calc(env(safe-area-inset-top,0px) + 20px)}
+    .setup-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;background:linear-gradient(135deg,var(--accent),var(--accent2,#ff6b35));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:24px}
+    .setup-title{font-size:22px;font-weight:800;margin-bottom:6px}
+    .setup-sub{font-size:14px;color:var(--muted);margin-bottom:28px}
+    .form-group{margin-bottom:18px}
+    label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px}
+    input,textarea,select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;transition:border-color 0.2s}
+    input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+    .emoji-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .emoji-opt{font-size:28px;cursor:pointer;padding:6px;border-radius:8px;border:2px solid transparent;transition:all 0.15s}
+    .emoji-opt.active{border-color:var(--accent);background:rgba(255,45,85,0.1)}
+    .color-opts{display:flex;gap:8px;margin-top:8px}
+    .color-opt{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s}
+    .color-opt.active{border-color:white;transform:scale(1.1)}
+    .go-btn{width:100%;padding:17px;background:linear-gradient(135deg,var(--accent),var(--accent2,#ff6b35));border:none;border-radius:14px;color:white;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px}
+    .back-link{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;cursor:pointer;margin-bottom:20px}
+
+    /* Live screen */
+    #liveScreen{display:none;flex-direction:column;min-height:100dvh}
+    .live-header{padding:14px 16px;padding-top:calc(env(safe-area-inset-top,0px) + 14px);background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .live-badge{background:var(--accent);color:white;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;letter-spacing:1px}
+    .live-title-display{flex:1;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .viewer-chip{background:rgba(255,255,255,0.08);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px}
+    .end-btn-live{background:rgba(255,45,85,0.15);border:1px solid rgba(255,45,85,0.4);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:8px 16px;cursor:pointer}
+
+    /* Room background */
+    .room-bg{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden}
+    .room-hero{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;text-align:center;flex-shrink:0}
+    .room-emoji-big{font-size:64px;margin-bottom:12px;animation:float 3s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    .room-topic{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px}
+    .room-sub{font-size:13px;color:var(--muted)}
+    .stats-row{display:flex;justify-content:center;gap:24px;margin-top:12px}
+    .stat-item{text-align:center}
+    .stat-num{font-size:18px;font-weight:800}
+    .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+
+    /* Chat */
+    .chat-box{flex:1;overflow-y:auto;background:var(--surface);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0}
+    .chat-box::-webkit-scrollbar{display:none}
+    .chat-msg{display:flex;align-items:flex-start;gap:8px}
+    .chat-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0}
+    .chat-bubble{background:rgba(255,255,255,0.06);border-radius:0 12px 12px 12px;padding:8px 12px;max-width:85%}
+    .chat-bubble.host-msg{background:rgba(255,45,85,0.12);border-radius:12px}
+    .chat-name{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:2px}
+    .chat-name.host-name{color:var(--gold)}
+    .chat-text{font-size:14px;line-height:1.4;word-break:break-word}
+    .system-line{text-align:center;font-size:12px;color:var(--muted);padding:4px 0}
+
+    /* Input bar */
+    .input-bar{padding:10px 16px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 10px);background:var(--bg);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+    .chat-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:11px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none}
+    .send-btn{background:var(--accent);border:none;border-radius:50%;width:44px;height:44px;color:white;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+
+    .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid #333;border-radius:12px;padding:12px 20px;font-size:14px;color:white;z-index:999;display:none;white-space:nowrap}
+    .toast.show{display:block}
+    .spinner{width:24px;height:24px;border:3px solid rgba(255,255,255,0.2);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- SETUP -->
+<div id="setupScreen">
+  <div class="back-link" onclick="history.back()">← Balik</div>
+  <div class="setup-logo">VIBES</div>
+  <div class="setup-title">💬 Live Kotak Teks</div>
+  <div class="setup-sub">Live tanpa kamera — chat je dengan penonton kau</div>
+
+  <div class="form-group">
+    <label>Tajuk Room</label>
+    <input id="roomTitle" type="text" placeholder="Contoh: Q&A Malam Ni 🔥" maxlength="60"/>
+  </div>
+
+  <div class="form-group">
+    <label>Topik / Soalan (Optional)</label>
+    <textarea id="roomTopic" rows="2" placeholder="Apa yang nak dibincangkan?" maxlength="120"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>Emoji Room</label>
+    <div class="emoji-row" id="emojiRow"></div>
+  </div>
+
+  <div class="form-group">
+    <label>Warna Latar</label>
+    <div class="color-opts" id="colorOpts"></div>
+  </div>
+
+  <button class="go-btn" onclick="startTextLive()">💬 Buka Room Sekarang</button>
+</div>
+
+<!-- LIVE -->
+<div id="liveScreen">
+  <div class="live-header">
+    <span class="live-badge">LIVE</span>
+    <span class="live-title-display" id="liveTitle">—</span>
+    <span class="viewer-chip">👁 <span id="viewerCount">0</span></span>
+    <button class="end-btn-live" onclick="confirmEnd()">End</button>
+  </div>
+
+  <div class="room-bg" id="roomBg">
+    <div class="room-hero">
+      <div class="room-emoji-big" id="heroEmoji">💬</div>
+      <div class="room-topic" id="heroTopic">—</div>
+      <div class="room-sub" id="heroSub">Live Kotak Teks oleh @you</div>
+      <div class="stats-row">
+        <div class="stat-item"><div class="stat-num" id="statViewers">0</div><div class="stat-lbl">Penonton</div></div>
+        <div class="stat-item"><div class="stat-num" id="statMsgs">0</div><div class="stat-lbl">Mesej</div></div>
+      </div>
+    </div>
+    <div class="chat-box" id="chatBox"></div>
+  </div>
+
+  <div class="input-bar">
+    <input class="chat-input" id="hostInput" placeholder="Tulis mesej..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+    <button class="send-btn" onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+<script>
+let currentUser = null, currentProfile = null;
+let roomId = null, chatChannel = null;
+let viewerCount = 0, msgCount = 0;
+let selectedEmoji = '💬';
+let selectedBg = '#0a0a0a';
+let heartbeat = null;
+
+const EMOJIS_LIVE = ['💬','🔥','❤️','🎵','🎮','💡','😂','🌙','✨','🎉','💎','🤔'];
+const BG_COLORS_LIVE = ['#0a0a0a','#0a0a1e','#0a1a0a','#1a0a0a','#1a1005','#0a1020'];
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) return window.location.href = 'auth.html';
+  currentProfile = await getCurrentProfile();
+
+  // Render emoji & color pickers
+  document.getElementById('emojiRow').innerHTML = EMOJIS_LIVE.map(e =>
+    `<span class="emoji-opt ${e==='💬'?'active':''}" onclick="pickEmoji('${e}',this)">${e}</span>`).join('');
+  document.getElementById('colorOpts').innerHTML = BG_COLORS_LIVE.map((c,i) =>
+    `<div class="color-opt ${i===0?'active':''}" style="background:${c}" onclick="pickBg('${c}',this)"></div>`).join('');
+}
+
+function pickEmoji(e, el) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-opt').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function pickBg(c, el) {
+  selectedBg = c;
+  document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function startTextLive() {
+  const title = document.getElementById('roomTitle').value.trim();
+  if (!title) { showToast('Masukkan tajuk room dulu!'); return; }
+  const topic = document.getElementById('roomTopic').value.trim();
+
+  const btn = document.querySelector('.go-btn');
+  btn.disabled = true; btn.textContent = 'Membuka room...';
+
+  const { data: room, error } = await sb.from('live_text_rooms').insert({
+    host_id: currentUser.id, title, topic,
+    bg_emoji: selectedEmoji, bg_color: selectedBg, status: 'live'
+  }).select().single();
+
+  if (error) { showToast('Gagal: ' + error.message); btn.disabled = false; btn.textContent = '💬 Buka Room Sekarang'; return; }
+  roomId = room.id;
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('liveScreen').style.display = 'flex';
+  document.getElementById('liveTitle').textContent = title;
+  document.getElementById('heroEmoji').textContent = selectedEmoji;
+  document.getElementById('heroTopic').textContent = topic || title;
+  document.getElementById('heroSub').textContent = `Live oleh @${currentProfile.username}`;
+  document.getElementById('roomBg').style.background = selectedBg;
+
+  startChat();
+  startHeartbeat();
+  addSystemMsg(`🔴 Room dibuka oleh @${currentProfile.username}`);
+}
+
+function startChat() {
+  chatChannel = sb.channel(`live-text-${roomId}`, { config: { broadcast: { self: true } } })
+    .on('broadcast', { event: 'msg' }, ({ payload }) => {
+      addMsg(payload.username, payload.text, payload.isHost, false, payload.avatar);
+      msgCount++;
+      document.getElementById('statMsgs').textContent = msgCount;
+    })
+    .on('broadcast', { event: 'join' }, ({ payload }) => {
+      if (payload.userId !== currentUser.id) {
+        viewerCount++;
+        document.getElementById('viewerCount').textContent = viewerCount;
+        document.getElementById('statViewers').textContent = viewerCount;
+        addSystemMsg(`👋 @${payload.username} menyertai`);
+        sb.from('live_text_rooms').update({ viewer_count: viewerCount }).eq('id', roomId);
+      }
+    })
+    .on('broadcast', { event: 'leave' }, ({ payload }) => {
+      viewerCount = Math.max(0, viewerCount - 1);
+      document.getElementById('viewerCount').textContent = viewerCount;
+      document.getElementById('statViewers').textContent = viewerCount;
+    })
+    .subscribe();
+}
+
+function startHeartbeat() {
+  heartbeat = setInterval(() => {
+    sb.from('live_text_rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
+  }, 30000);
+}
+
+async function sendMsg() {
+  const input = document.getElementById('hostInput');
+  const text = input.value.trim();
+  if (!text || !chatChannel) return;
+  input.value = '';
+  chatChannel.send({ type:'broadcast', event:'msg', payload:{
+    username: currentProfile.username, text, isHost: true, avatar: getAvatarUrl(currentProfile)
+  }});
+  // Save to DB
+  sb.from('live_text_messages').insert({ room_id: roomId, user_id: currentUser.id, content: text, is_host: true });
+}
+
+function addMsg(username, text, isHost=false, isSystem=false, avatar='') {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  if (isSystem) {
+    div.className = 'system-line'; div.textContent = text;
+  } else {
+    div.className = 'chat-msg';
+    div.innerHTML = `
+      <img class="chat-avatar" src="${avatar || 'https://ui-avatars.com/api/?name=U&background=random&color=fff&bold=true&size=64'}" onerror="this.src='https://ui-avatars.com/api/?name=U'"/>
+      <div class="chat-bubble ${isHost ? 'host-msg' : ''}">
+        <div class="chat-name ${isHost ? 'host-name' : ''}">${isHost ? '👑 ' : ''}@${username}</div>
+        <div class="chat-text">${text}</div>
+      </div>`;
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function addSystemMsg(text) { addMsg('', text, false, true); }
+
+function confirmEnd() {
+  if (confirm('Tamatkan live room sekarang?')) endLive();
+}
+
+async function endLive() {
+  clearInterval(heartbeat);
+  chatChannel?.send({ type:'broadcast', event:'room-ended', payload:{} });
+  await sb.from('live_text_rooms').update({ status:'ended', ended_at: new Date().toISOString() }).eq('id', roomId);
+  window.location.href = 'live-list.html';
+}
+
+window.addEventListener('beforeunload', () => {
+  if (roomId) sb.from('live_text_rooms').update({ status:'ended', ended_at: new Date().toISOString() }).eq('id', roomId);
+});
+
+init();
+</script>
+</body>
+</html>

@@ -165,51 +165,86 @@
 <!-- Payment Method -->
 <div class="section-title">Cara Bayar 💳</div>
 <div class="pay-methods">
-  <div class="pay-method selected" id="pm_toyyibpay" onclick="selectMethod('toyyibpay')">
-    <div class="pay-method-icon">🏦</div>
-    <div class="pay-method-info">
-      <div class="pay-method-name">FPX / Online Banking <span class="pay-badge auto">AUTO ✓</span></div>
-      <div class="pay-method-sub">Maybank, CIMB, Public Bank, RHB dll</div>
-    </div>
-    <div class="pay-radio"></div>
-  </div>
-  <div class="pay-method" id="pm_card" onclick="selectMethod('card')">
-    <div class="pay-method-icon">💳</div>
-    <div class="pay-method-info">
-      <div class="pay-method-name">Kad Kredit/Debit <span class="pay-badge auto">AUTO ✓</span></div>
-      <div class="pay-method-sub">Visa, Mastercard — via ToyyibPay</div>
-    </div>
-    <div class="pay-radio"></div>
-  </div>
-  <div class="pay-method" id="pm_manual" onclick="selectMethod('manual')">
+  <div class="pay-method selected" id="pm_duitnow" onclick="selectMethod('duitnow')">
     <div class="pay-method-icon">📱</div>
     <div class="pay-method-info">
-      <div class="pay-method-name">DuitNow QR / Transfer Manual <span class="pay-badge manual">MANUAL</span></div>
-      <div class="pay-method-sub">Transfer & hantar resit — 1–24 jam</div>
+      <div class="pay-method-name">DuitNow QR <span class="pay-badge manual">DISYORKAN</span></div>
+      <div class="pay-method-sub">Scan QR dari mana-mana bank/e-wallet</div>
+    </div>
+    <div class="pay-radio"></div>
+  </div>
+  <div class="pay-method" id="pm_transfer" onclick="selectMethod('transfer')">
+    <div class="pay-method-icon">🏦</div>
+    <div class="pay-method-info">
+      <div class="pay-method-name">Bank Transfer / IBG <span class="pay-badge manual">MANUAL</span></div>
+      <div class="pay-method-sub">Transfer terus ke akaun VIBES</div>
+    </div>
+    <div class="pay-radio"></div>
+  </div>
+  <div class="pay-method" id="pm_ewallet" onclick="selectMethod('ewallet')">
+    <div class="pay-method-icon">💚</div>
+    <div class="pay-method-info">
+      <div class="pay-method-name">TNG / GrabPay / Boost <span class="pay-badge manual">MANUAL</span></div>
+      <div class="pay-method-sub">Hantar ke nombor telefon berdaftar</div>
     </div>
     <div class="pay-radio"></div>
   </div>
 </div>
 
-<!-- Manual payment info (bank details) -->
-<div class="manual-info" id="manualInfo">
-  <div class="manual-header">📋 Maklumat Pembayaran</div>
-  <div class="manual-row">
-    <span class="manual-label">Bank</span>
-    <span class="manual-val" id="bankName">Maybank</span>
+<!-- Payment details (all manual) -->
+<div class="manual-info show" id="manualInfo">
+  <!-- DuitNow QR info -->
+  <div id="payInfo_duitnow">
+    <div class="manual-header">📱 DuitNow QR — Scan & Bayar</div>
+    <div style="text-align:center;padding:16px">
+      <div style="background:white;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px">
+        <div style="font-size:80px;line-height:1">📲</div>
+        <div style="font-size:11px;color:#333;margin-top:4px">QR akan diisi oleh admin</div>
+      </div>
+      <div style="font-size:13px;color:var(--muted)">Scan QR di atas guna mana-mana<br>bank app atau e-wallet kau</div>
+    </div>
+    <div class="manual-row">
+      <span class="manual-label">ID DuitNow</span>
+      <span class="manual-val"><span id="duitnowId">012-345-6789</span><button class="copy-btn" onclick="copyText(document.getElementById('duitnowId').textContent)">Copy</button></span>
+    </div>
+    <div class="manual-row">
+      <span class="manual-label">Nama</span>
+      <span class="manual-val" id="duitnowName">NAMA KAU</span>
+    </div>
+    <div class="manual-note">⚠️ Wajib tulis <strong>username VIBES</strong> dalam nota pembayaran</div>
   </div>
-  <div class="manual-row">
-    <span class="manual-label">No. Akaun</span>
-    <span class="manual-val">
-      <span id="bankAccount">1234-5678-9012</span>
-      <button class="copy-btn" onclick="copyText(document.getElementById('bankAccount').textContent)">Copy</button>
-    </span>
+
+  <!-- Bank Transfer info -->
+  <div id="payInfo_transfer" style="display:none">
+    <div class="manual-header">🏦 Bank Transfer / IBG</div>
+    <div class="manual-row">
+      <span class="manual-label">Bank</span>
+      <span class="manual-val" id="bankName2">Maybank</span>
+    </div>
+    <div class="manual-row">
+      <span class="manual-label">No. Akaun</span>
+      <span class="manual-val"><span id="bankAcc2">1234-5678-9012</span><button class="copy-btn" onclick="copyText(document.getElementById('bankAcc2').textContent.trim())">Copy</button></span>
+    </div>
+    <div class="manual-row">
+      <span class="manual-label">Nama</span>
+      <span class="manual-val" id="bankHolder2">NAMA KAU</span>
+    </div>
+    <div class="manual-note">⚠️ Wajib tulis <strong>username VIBES</strong> dalam rujukan</div>
   </div>
-  <div class="manual-row">
-    <span class="manual-label">Nama</span>
-    <span class="manual-val" id="bankHolder">VIBES PLATFORM SDN BHD</span>
+
+  <!-- E-Wallet info -->
+  <div id="payInfo_ewallet" style="display:none">
+    <div class="manual-header">💚 TNG / GrabPay / Boost</div>
+    <div class="manual-row">
+      <span class="manual-label">No. Telefon</span>
+      <span class="manual-val"><span id="ewalletPhone">01X-XXX-XXXX</span><button class="copy-btn" onclick="copyText(document.getElementById('ewalletPhone').textContent.trim())">Copy</button></span>
+    </div>
+    <div class="manual-row">
+      <span class="manual-label">Nama</span>
+      <span class="manual-val" id="ewalletName">NAMA KAU</span>
+    </div>
+    <div class="manual-note">⚠️ Wajib tulis <strong>username VIBES</strong> dalam nota</div>
   </div>
-  <div class="manual-note">⚠️ Wajib tulis <strong>username VIBES</strong> dalam nota pemindahan</div>
 </div>
 
 <!-- Receipt upload (manual only) -->
@@ -258,15 +293,19 @@
 <script>
 let currentUser = null, currentProfile = null;
 let packages = [], selectedPkg = null;
-let selectedMethod = 'toyyibpay';
+let selectedMethod = 'duitnow';
 let receiptFile = null;
 let myCoins = 0;
 
-// ⚠️ TUKAR ini kepada bank details kau
-const BANK_DETAILS = {
-  bank: 'Maybank',
-  account: '1234-5678-9012',
-  holder: 'NAMA PENUH KAU'
+// ⚠️ TUKAR ini kepada maklumat pembayaran kau
+const PAYMENT_INFO = {
+  duitnowId:    '012-345-6789',    // No. telefon DuitNow kau
+  duitnowName:  'NAMA PENUH KAU',
+  bank:         'Maybank',
+  bankAccount:  '1234-5678-9012',
+  bankHolder:   'NAMA PENUH KAU',
+  ewalletPhone: '012-345-6789',
+  ewalletName:  'NAMA PENUH KAU'
 };
 
 function showToast(msg, ms=3000) {
@@ -291,16 +330,6 @@ async function init() {
   currentProfile = await getCurrentProfile();
 
   // Check return from ToyyibPay
-  const params = new URLSearchParams(window.location.search);
-  const status = params.get('status');
-  const ref = params.get('ref');
-
-  if (status === 'success' && ref) {
-    await handlePaymentReturn(ref);
-  } else if (status === 'cancel') {
-    showStatusBanner('pending', '⏳ Pembayaran dibatalkan. Cuba lagi.');
-  }
-
   // Load wallet
   let { data: wallet } = await sb.from('user_coins').select('*').eq('user_id', currentUser.id).maybeSingle();
   if (!wallet) {
@@ -316,14 +345,18 @@ async function init() {
   packages = pkgs || [];
   renderPackages();
 
-  // Set bank details
-  document.getElementById('bankName').textContent = BANK_DETAILS.bank;
-  document.getElementById('bankAccount').textContent = BANK_DETAILS.account;
-  document.getElementById('bankHolder').textContent = BANK_DETAILS.holder;
+  // Set payment details
+  document.getElementById('duitnowId').textContent    = PAYMENT_INFO.duitnowId;
+  document.getElementById('duitnowName').textContent  = PAYMENT_INFO.duitnowName;
+  document.getElementById('bankName2').textContent    = PAYMENT_INFO.bank;
+  document.getElementById('bankAcc2').textContent     = PAYMENT_INFO.bankAccount;
+  document.getElementById('bankHolder2').textContent  = PAYMENT_INFO.bankHolder;
+  document.getElementById('ewalletPhone').textContent = PAYMENT_INFO.ewalletPhone;
+  document.getElementById('ewalletName').textContent  = PAYMENT_INFO.ewalletName;
 
   loadHistory();
 
-  // Subscribe to realtime topup approval
+  // Subscribe realtime topup approval
   sb.channel(`topup-realtime-${currentUser.id}`)
     .on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'topup_requests',
@@ -403,16 +436,14 @@ function selectMethod(method) {
   document.querySelectorAll('.pay-method').forEach(el => el.classList.remove('selected'));
   document.getElementById('pm_' + method)?.classList.add('selected');
 
-  // Show/hide manual info
-  const manualInfo = document.getElementById('manualInfo');
-  const receiptWrap = document.getElementById('receiptWrap');
-  if (method === 'manual') {
-    manualInfo.classList.add('show');
-    receiptWrap.classList.add('show');
-  } else {
-    manualInfo.classList.remove('show');
-    receiptWrap.classList.remove('show');
-  }
+  // Show correct payment info panel
+  ['duitnow','transfer','ewallet'].forEach(m => {
+    const el = document.getElementById('payInfo_' + m);
+    if (el) el.style.display = m === method ? 'block' : 'none';
+  });
+
+  // Receipt always shown (all methods need receipt)
+  document.getElementById('receiptWrap').classList.add('show');
   updateSummary();
 }
 
@@ -426,14 +457,8 @@ function updateSummary() {
 
   const btn = document.getElementById('payBtn');
   btn.disabled = false;
-
-  if (selectedMethod === 'manual') {
-    btn.textContent = `📤 Hantar Resit — RM ${Number(selectedPkg.price_myr).toFixed(2)}`;
-    btn.className = 'pay-btn';
-  } else {
-    btn.textContent = `🏦 Bayar RM ${Number(selectedPkg.price_myr).toFixed(2)} via Online Banking`;
-    btn.className = 'pay-btn toyyib';
-  }
+  btn.className = 'pay-btn';
+  btn.textContent = `📤 Hantar Resit — RM ${Number(selectedPkg.price_myr).toFixed(2)}`;
 }
 
 function previewReceipt(input) {
@@ -445,55 +470,14 @@ function previewReceipt(input) {
   document.getElementById('receiptText').textContent = '✅ ' + receiptFile.name;
 }
 
-// ── PROCESS PAYMENT ───────────────────────────────
+// ── PROCESS PAYMENT (semua manual) ───────────────
 async function processPayment() {
   if (!selectedPkg) return showToast('Pilih pakej dulu!');
   if (!currentUser) return window.location.href = 'auth.html';
-
-  if (selectedMethod === 'manual') {
-    await submitManualTopup();
-  } else {
-    await initiateToyyibPay();
-  }
+  await submitManualTopup();
 }
 
-// ── AUTO: ToyyibPay FPX/Card ─────────────────────
-async function initiateToyyibPay() {
-  showLoading('Membuat bil pembayaran...', 'Connecting to ToyyibPay');
-
-  try {
-    const res = await fetch('/.netlify/functions/payment-create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        packageId: selectedPkg.id,
-        coins: selectedPkg.coins + (selectedPkg.bonus_coins || 0),
-        priceMyr: selectedPkg.price_myr,
-        username: currentProfile?.username || 'user',
-        email: currentUser.email || '',
-        packageName: selectedPkg.name
-      })
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (!res.ok || !data.paymentUrl) {
-      throw new Error(data.error || 'Gagal buat bil pembayaran');
-    }
-
-    // Redirect to ToyyibPay payment page
-    window.location.href = data.paymentUrl;
-
-  } catch (err) {
-    hideLoading();
-    showToast('❌ ' + err.message, 5000);
-    console.error('ToyyibPay error:', err);
-  }
-}
-
-// ── MANUAL: Upload resit ─────────────────────────
+// ── SUBMIT RESIT ──────────────────────────────────
 async function submitManualTopup() {
   if (!receiptFile) return showToast('Sila upload resit pembayaran!');
 
@@ -516,7 +500,7 @@ async function submitManualTopup() {
       package_id: selectedPkg.id,
       coins_amount: total,
       price_myr: selectedPkg.price_myr,
-      payment_method: 'manual',
+      payment_method: selectedMethod,
       receipt_url: receiptUrl,
       status: 'pending'
     });
@@ -552,7 +536,7 @@ async function loadHistory() {
   const list = document.getElementById('historyList');
   if (!data?.length) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:14px">Belum ada sejarah top up</div>'; return; }
 
-  const methodLabel = { toyyibpay: '🏦 FPX/Online', card: '💳 Kad', manual: '📱 Manual' };
+  const methodLabel = { duitnow: '📱 DuitNow', transfer: '🏦 Bank Transfer', ewallet: '💚 E-Wallet' };
 
   list.innerHTML = data.map(t => `
     <div class="history-item">

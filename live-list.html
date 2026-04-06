@@ -63,13 +63,42 @@
 <div class="top-bar">
   <button class="back-btn" onclick="history.back()">←</button>
   <span class="page-logo">🔴 LIVE</span>
-  <a class="golive-link" href="go-live.html">🔴 Go Live</a>
+  <button class="golive-link" onclick="showGoLiveChoice()">🔴 Go Live</button>
 </div>
 
 <div class="page-title"><div class="live-dot"></div> Live Sekarang</div>
 
+<!-- Tabs: Video | Text Room -->
+<div style="display:flex;gap:0;padding:0 16px 12px;border-bottom:1px solid #1e1e1e;margin-bottom:4px">
+  <button id="tab_video" onclick="switchLiveTab('video')" style="flex:1;padding:9px;background:rgba(255,45,85,0.1);border:none;border-bottom:2px solid var(--live);color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">📹 Live Video</button>
+  <button id="tab_text" onclick="switchLiveTab('text')" style="flex:1;padding:9px;background:none;border:none;border-bottom:2px solid transparent;color:#555;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💬 Live Kotak</button>
+</div>
+
 <div class="live-grid" id="liveGrid">
   <div style="grid-column:1/-1"><div class="spinner"></div></div>
+</div>
+
+<!-- Go Live Choice Modal -->
+<div id="goLiveModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.85);align-items:flex-end;justify-content:center">
+  <div style="background:#111;border-radius:24px 24px 0 0;padding:28px 20px calc(env(safe-area-inset-bottom,16px) + 28px);width:100%;max-width:500px">
+    <div style="font-size:18px;font-weight:800;margin-bottom:6px;text-align:center">Pilih Jenis Live</div>
+    <div style="font-size:13px;color:#555;text-align:center;margin-bottom:24px">Nak live macam mana?</div>
+    <a href="go-live.html" style="display:flex;align-items:center;gap:16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;padding:18px;text-decoration:none;color:white;margin-bottom:12px">
+      <div style="font-size:40px;flex-shrink:0">📹</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px">Live Video</div>
+        <div style="font-size:13px;color:#555">Guna kamera phone kau — penonton boleh tengok & hantar gift</div>
+      </div>
+    </a>
+    <a href="go-live-text.html" style="display:flex;align-items:center;gap:16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;padding:18px;text-decoration:none;color:white;margin-bottom:20px">
+      <div style="font-size:40px;flex-shrink:0">💬</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px">Live Kotak Teks</div>
+        <div style="font-size:13px;color:#555">Tanpa kamera — chat je dengan penonton, sesuai bila nak Q&A</div>
+      </div>
+    </a>
+    <button onclick="closeGoLiveChoice()" style="width:100%;padding:14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;color:#555;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer">Batal</button>
+  </div>
 </div>
 
 <nav class="bottom-nav">
@@ -81,73 +110,84 @@
 </nav>
 
 <script>
-// Load notif badge
-(async () => {
-  const user = await getCurrentUser();
-  if (!user) return;
-  const { count } = await sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',user.id).eq('is_read',false);
-  // live-list doesn't have notif tab, just verify auth
-})();
-async function loadLive() {
-  // ✅ FIX: Only show rooms that are 'live' AND started within last 6 hours
-  // This prevents orphaned rooms from showing
-  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+let liveTab = 'video';
 
-  const { data: rooms } = await sb
-    .from('live_rooms')
+function showGoLiveChoice() {
+  document.getElementById('goLiveModal').style.display = 'flex';
+}
+function closeGoLiveChoice() {
+  document.getElementById('goLiveModal').style.display = 'none';
+}
+
+function switchLiveTab(tab) {
+  liveTab = tab;
+  document.getElementById('tab_video').style.cssText = `flex:1;padding:9px;background:${tab==='video'?'rgba(255,45,85,0.1)':'none'};border:none;border-bottom:2px solid ${tab==='video'?'var(--live)':'transparent'};color:${tab==='video'?'white':'#555'};font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer`;
+  document.getElementById('tab_text').style.cssText = `flex:1;padding:9px;background:${tab==='text'?'rgba(255,45,85,0.1)':'none'};border:none;border-bottom:2px solid ${tab==='text'?'var(--live)':'transparent'};color:${tab==='text'?'white':'#555'};font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer`;
+  if (tab === 'video') loadLive(); else loadTextRooms();
+}
+
+async function loadLive() {
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const { data: rooms } = await sb.from('live_rooms')
     .select('*, profiles(id, username, display_name, avatar_url)')
-    .eq('status', 'live')
-    .gte('started_at', sixHoursAgo)
+    .eq('status', 'live').gte('started_at', sixHoursAgo)
     .order('viewer_count', { ascending: false });
 
   const grid = document.getElementById('liveGrid');
-
-  if (!rooms || rooms.length === 0) {
-    grid.innerHTML = `
-      <div style="grid-column:1/-1">
-        <div class="empty-state">
-          <div class="empty-emoji">📡</div>
-          <div class="empty-title">Tiada live sekarang</div>
-          <div class="empty-sub">Jadilah yang pertama go live!</div>
-          <a href="go-live.html" style="display:inline-block;margin-top:16px;background:var(--live);color:white;padding:12px 28px;border-radius:12px;font-weight:700;text-decoration:none;">🔴 Go Live</a>
-        </div>
-      </div>`;
+  if (!rooms?.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-emoji">📡</div><div class="empty-title">Tiada live video sekarang</div><div class="empty-sub">Jadilah yang pertama!</div><button onclick="showGoLiveChoice()" style="margin-top:16px;background:var(--live);color:white;padding:12px 28px;border-radius:12px;font-weight:700;border:none;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🔴 Go Live</button></div></div>`;
     return;
   }
-
   grid.innerHTML = rooms.map(r => `
     <div class="live-card" onclick="window.location.href='live.html?id=${r.id}'">
       <div class="live-card-placeholder">📹</div>
       <div class="live-card-overlay"></div>
-      <div class="live-card-top">
-        <span class="live-badge">LIVE</span>
-        <span class="viewer-badge">👁 ${r.viewer_count || 0}</span>
-      </div>
+      <div class="live-card-top"><span class="live-badge">LIVE</span><span class="viewer-badge">👁 ${r.viewer_count||0}</span></div>
       <div class="live-card-bottom">
         <div class="card-avatar-row">
-          <img class="card-avatar" src="${getAvatarUrl(r.profiles)}" alt="${r.profiles?.username}"
-            onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.profiles?.username||'U')}&background=random&color=fff'" />
+          <img class="card-avatar" src="${getAvatarUrl(r.profiles)}" alt="${r.profiles?.username}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.profiles?.username||'U')}&background=random&color=fff'"/>
           <span class="card-username">@${r.profiles?.username}</span>
         </div>
-        <div class="card-title">${r.title || 'Live Stream'}</div>
+        <div class="card-title">${r.title||'Live Stream'}</div>
       </div>
     </div>`).join('');
 }
 
-// ✅ FIX: Realtime — reload on ANY change to live_rooms
-sb.channel('live-rooms-realtime')
-  .on('postgres_changes', {
-    event: '*',        // INSERT, UPDATE, DELETE
-    schema: 'public',
-    table: 'live_rooms'
-  }, () => {
-    loadLive();        // reload the whole list
-  })
+async function loadTextRooms() {
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const { data: rooms } = await sb.from('live_text_rooms')
+    .select('*, profiles(id, username, display_name, avatar_url)')
+    .eq('status', 'live').gte('started_at', sixHoursAgo)
+    .order('viewer_count', { ascending: false });
+
+  const grid = document.getElementById('liveGrid');
+  if (!rooms?.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-emoji">💬</div><div class="empty-title">Tiada live kotak sekarang</div><div class="empty-sub">Buka room teks kau!</div><button onclick="showGoLiveChoice()" style="margin-top:16px;background:var(--live);color:white;padding:12px 28px;border-radius:12px;font-weight:700;border:none;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">💬 Buka Room</button></div></div>`;
+    return;
+  }
+  grid.innerHTML = rooms.map(r => `
+    <div class="live-card" onclick="window.location.href='live-text.html?id=${r.id}'">
+      <div class="live-card-placeholder" style="font-size:52px;background:${r.bg_color||'#111'}">${r.bg_emoji||'💬'}</div>
+      <div class="live-card-overlay"></div>
+      <div class="live-card-top"><span class="live-badge" style="background:#3b82f6">KOTAK</span><span class="viewer-badge">👁 ${r.viewer_count||0}</span></div>
+      <div class="live-card-bottom">
+        <div class="card-avatar-row">
+          <img class="card-avatar" src="${getAvatarUrl(r.profiles)}" alt="${r.profiles?.username}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.profiles?.username||'U')}&background=random&color=fff'"/>
+          <span class="card-username">@${r.profiles?.username}</span>
+        </div>
+        <div class="card-title">${r.title||'Live Kotak'}</div>
+      </div>
+    </div>`).join('');
+}
+
+// Realtime
+sb.channel('live-all-realtime')
+  .on('postgres_changes',{event:'*',schema:'public',table:'live_rooms'},()=>{if(liveTab==='video')loadLive()})
+  .on('postgres_changes',{event:'*',schema:'public',table:'live_text_rooms'},()=>{if(liveTab==='text')loadTextRooms()})
   .subscribe();
 
 loadLive();
-// Auto-refresh every 60 seconds as fallback
-setInterval(loadLive, 60000);
+setInterval(()=>{ liveTab==='video' ? loadLive() : loadTextRooms(); }, 60000);
 </script>
   <script src="js/pwa.js"></script>
 </body>
