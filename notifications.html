@@ -211,7 +211,10 @@ function getNotifLink(n) {
   if (n.entity_type === 'video') return `video.html?id=${n.entity_id}`;
   if (n.entity_type === 'profile') return `profile.html?id=${n.entity_id}`;
   if (n.entity_type === 'live') return `live.html?id=${n.entity_id}`;
-  if (n.entity_type === 'topup' || n.entity_type === 'withdraw') return `wallet.html`;
+  if (n.entity_type === 'live_text') return `live-text.html?id=${n.entity_id}`;
+  if (n.entity_type === 'topup' || n.entity_type === 'withdraw' || n.entity_type === 'admin_gift') return `wallet.html`;
+  if (n.entity_type === 'status_reply') return `status.html`;
+  if (n.entity_type === 'broadcast') return `notifications.html`;
   return '#';
 }
 

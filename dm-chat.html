@@ -255,6 +255,8 @@ function subscribeMessages() {
     .subscribe();
 }
 
+function goToProfile() { window.location.href = 'profile.html?id=' + otherUserId; }
+
 async function sendImage(input) {
   const file = input.files[0];
   if (!file || isSending) return;

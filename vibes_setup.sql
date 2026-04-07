@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS dm_messages (
   conversation_id  UUID REFERENCES dm_conversations(id) ON DELETE CASCADE NOT NULL,
   sender_id        UUID REFERENCES profiles(id)          ON DELETE CASCADE NOT NULL,
   content          TEXT NOT NULL,
+  image_url        TEXT,
   is_read          BOOLEAN DEFAULT FALSE,
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
@@ -966,12 +967,14 @@ BEGIN
 END;$$;
 
 -- Get or create DM conversation (called from frontend via RPC)
-CREATE OR REPLACE FUNCTION get_or_create_conversation(user_a UUID, user_b UUID)
+-- Accept both (user_a, user_b) and (p_user1, p_user2) param names
+CREATE OR REPLACE FUNCTION get_or_create_conversation(p_user1 UUID, p_user2 UUID)
 RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE conv_id UUID; u1 UUID; u2 UUID;
 BEGIN
-  IF user_a < user_b THEN u1:=user_a; u2:=user_b;
-  ELSE u1:=user_b; u2:=user_a; END IF;
+  -- Canonical order to avoid duplicates
+  IF p_user1 < p_user2 THEN u1:=p_user1; u2:=p_user2;
+  ELSE u1:=p_user2; u2:=p_user1; END IF;
   SELECT id INTO conv_id FROM dm_conversations WHERE user1_id=u1 AND user2_id=u2;
   IF conv_id IS NULL THEN
     INSERT INTO dm_conversations(user1_id,user2_id) VALUES(u1,u2) RETURNING id INTO conv_id;

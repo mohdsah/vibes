@@ -821,7 +821,7 @@ async function loadPackages() {
           <span class="badge ${p.is_active ? 'badge-approved' : 'badge-rejected'}">${p.is_active ? 'Aktif' : 'Nyahaktif'}</span>
         </td>
         <td><div class="action-btns">
-          <button class="btn-approve" onclick="editPkg(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️ Edit</button>
+          <button class="btn-approve" onclick="editPkgById('${p.id}')">✏️ Edit</button>
           <button class="btn-view" onclick="togglePkgActive('${p.id}',${p.is_active})">${p.is_active ? 'Disable' : 'Enable'}</button>
           <button class="btn-reject" onclick="deletePkg('${p.id}','${p.name}')">🗑️</button>
         </div></td>
@@ -841,11 +841,14 @@ function openPkgModal(pkg = null) {
   document.getElementById('pkgModal').classList.add('show');
 }
 
+async function editPkgById(id) {
+  const { data: pkg } = await sb.from('coin_packages').select('*').eq('id', id).maybeSingle();
+  if (pkg) openPkgModal(pkg);
+}
+
 function editPkg(pkgObj) {
-  // pkgObj is already a JS object from the onclick
-  try {
-    openPkgModal(typeof pkgObj === 'string' ? JSON.parse(pkgObj) : pkgObj);
-  } catch(e) { openPkgModal(); }
+  try { openPkgModal(typeof pkgObj === 'string' ? JSON.parse(pkgObj) : pkgObj); }
+  catch(e) { openPkgModal(); }
 }
 
 function closePkgModal() {
@@ -934,14 +937,15 @@ async function unbanUser(userId, username) {
 async function giveCoins(userId, username) {
   const amount = parseInt(prompt(`Bagi coins kepada @${username}?\nJumlah coins:`));
   if (!amount || isNaN(amount) || amount <= 0) return;
-  const { error } = await sb.from('user_coins')
-    .upsert({ user_id: userId, coins: 0 }, { onConflict: 'user_id' });
-  await sb.from('user_coins')
-    .update({ coins: sb.rpc('raw', `coins + ${amount}`) })
-    .eq('user_id', userId);
-  // Simpler approach: read then update
-  const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', userId).maybeSingle();
-  await sb.from('user_coins').update({ coins: (w?.coins || 0) + amount, total_earned: (w?.total_earned || 0) + amount }).eq('user_id', userId);
+  // Read current coins then update atomically
+  const { data: w } = await sb.from('user_coins').select('coins,total_earned').eq('user_id', userId).maybeSingle();
+  const current = w?.coins || 0;
+  const earned = w?.total_earned || 0;
+  if (w) {
+    await sb.from('user_coins').update({ coins: current + amount, total_earned: earned + amount }).eq('user_id', userId);
+  } else {
+    await sb.from('user_coins').insert({ user_id: userId, coins: amount, total_earned: amount });
+  }
   await sb.from('notifications').insert({ user_id: userId, type: 'topup_approved', message: `🎁 Admin memberi kau 💎${amount} coins!`, entity_type: 'admin_gift' });
   showToastAdmin(`💎 ${amount} coins diberikan kepada @${username}!`);
 }
