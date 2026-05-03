@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/desktop.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root { --bg:#0a0a0a; --surface:#111; --border:#1e1e1e; --accent:#ff2d55; --accent2:#ff6b35; --text:#f0f0f0; --muted:#666; --gold:#ffd700; }
@@ -83,6 +84,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 </head>
 <body>
+<script>document.addEventListener('DOMContentLoaded',function(){if(typeof injectDesktopSidebar==='function')injectDesktopSidebar('profile');});</script>
 
 <div class="top-bar">
   <button class="back-btn" onclick="history.back()">←</button>
@@ -145,33 +147,59 @@ let isFollowing = false;
 let activeTab = 'videos'; // ✅ track active tab
 
 async function init() {
-  currentUser = await getCurrentUser();
-  const params = new URLSearchParams(window.location.search);
-  const profileId = params.get('id');
-  const targetId = profileId || currentUser?.id;
-  if (!targetId) return window.location.href = 'auth.html';
-  isOwnProfile = currentUser && currentUser.id === targetId;
+  try {
+    currentUser = await getCurrentUser();
+    const params = new URLSearchParams(window.location.search);
+    const profileId = params.get('id');
+    const targetId = profileId || currentUser?.id;
+    if (!targetId) return window.location.href = 'auth.html';
+    isOwnProfile = !!(currentUser && currentUser.id === targetId);
 
-  // Load notif badge
-  if (currentUser) {
-    sb.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',currentUser.id).eq('is_read',false).then(({count}) => {
-      if (count > 0) { const b = document.getElementById('notifBadge'); if(b){ b.textContent = count > 99 ? '99+' : count; b.style.display='block'; } }
-    });
-  }
+    // Notif badge — non-blocking
+    if (currentUser) {
+      sb.from('notifications').select('*',{count:'exact',head:true})
+        .eq('user_id', currentUser.id).eq('is_read', false)
+        .then(({count}) => {
+          if (count > 0) {
+            const b = document.getElementById('notifBadge');
+            if (b) { b.textContent = count > 99 ? '99+' : count; b.style.display = 'block'; }
+          }
+        }).catch(() => {});
+    }
 
-  const { data: profile } = await sb.from('profiles').select('*').eq('id', targetId).single();
-  if (!profile) { document.getElementById('profileHeader').innerHTML = '<p style="padding:20px;color:var(--muted)">Profil tidak dijumpai.</p>'; return; }
+    // Use maybeSingle() — no throw if not found
+    const { data: profile, error } = await sb.from('profiles')
+      .select('*').eq('id', targetId).maybeSingle();
 
-  viewingProfile = profile;
-  document.getElementById('topUsername').textContent = '@' + profile.username;
-  renderHeader(profile);
-  loadVideos(profile.id);
-  loadProfileStatus(profile.id);
+    if (error || !profile) {
+      document.getElementById('profileHeader').innerHTML =
+        '<div style="padding:48px 20px;text-align:center;color:#555">' +
+        '<div style="font-size:48px;margin-bottom:12px">👤</div>' +
+        '<p style="font-size:15px">Profil tidak dijumpai</p></div>';
+      document.getElementById('videoGrid').innerHTML = '';
+      return;
+    }
 
-  if (!isOwnProfile && currentUser) {
-    const { data: f } = await sb.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', profile.id).maybeSingle();
-    isFollowing = !!f;
-    updateFollowBtn();
+    viewingProfile = profile;
+    const topEl = document.getElementById('topUsername');
+    if (topEl) topEl.textContent = '@' + profile.username;
+    renderHeader(profile);
+    loadVideos(profile.id);
+    loadProfileStatus(profile.id).catch(() => {});
+
+    if (!isOwnProfile && currentUser) {
+      const { data: f } = await sb.from('follows').select('id')
+        .eq('follower_id', currentUser.id).eq('following_id', profile.id).maybeSingle();
+      isFollowing = !!f;
+      updateFollowBtn();
+    }
+  } catch(e) {
+    console.error('Profile init error:', e);
+    const h = document.getElementById('profileHeader');
+    if (h) h.innerHTML = '<div style="padding:48px 20px;text-align:center;color:#555">' +
+      '<div style="font-size:48px;margin-bottom:12px">⚠️</div>' +
+      '<p style="font-size:15px">Gagal muatkan profil</p>' +
+      '<button onclick="location.reload()" style="margin-top:12px;padding:10px 24px;background:#ff2d55;border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer">Cuba Semula</button></div>';
   }
 }
 
@@ -252,27 +280,32 @@ function renderGrid(vids, type) {
     </div>`).join('');
 }
 
-async async function loadProfileStatus(userId) {
-  const { data } = await sb.from('status_posts')
-    .select('id, bg_color, emoji, type, image_url, content')
-    .eq('user_id', userId)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(10);
+async function loadProfileStatus(userId) {
+  try {
+    const { data } = await sb.from('status_posts')
+      .select('id, bg_color, emoji, type, image_url, content')
+      .eq('user_id', userId)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-  if (!data?.length) return;
+    if (!data?.length) return;
 
-  const strip = document.getElementById('profileStatusStrip');
-  const row = document.getElementById('profileStatusRow');
-  strip.style.display = 'block';
+    const strip = document.getElementById('profileStatusStrip');
+    const row = document.getElementById('profileStatusRow');
+    if (!strip || !row) return;
+    strip.style.display = 'block';
 
-  row.innerHTML = data.map(s => {
-    let inner = '';
-    if (s.type === 'emoji') inner = `<div style="font-size:28px">${s.emoji}</div>`;
-    else if (s.type === 'image' && s.image_url) inner = `<img src="${s.image_url}" style="width:100%;height:100%;object-fit:cover"/>`;
-    else inner = `<div style="font-size:11px;font-weight:600;padding:4px;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${s.content||''}</div>`;
-    return `<div onclick="window.location.href='view-status.html?id=${s.id}'" style="flex-shrink:0;width:60px;height:60px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;cursor:pointer;background:${s.bg_color||'#111'};display:flex;align-items:center;justify-content:center">${inner}</div>`;
-  }).join('');
+    row.innerHTML = data.map(s => {
+      let inner = '';
+      if (s.type === 'emoji' && s.emoji) inner = `<div style="font-size:28px">${s.emoji}</div>`;
+      else if (s.type === 'image' && s.image_url) inner = `<img src="${s.image_url}" style="width:100%;height:100%;object-fit:cover" alt=""/>`;
+      else inner = `<div style="font-size:11px;font-weight:600;padding:4px;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${s.content||''}</div>`;
+      return `<div onclick="window.location.href='view-status.html?id=${s.id}'" style="flex-shrink:0;width:60px;height:60px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;cursor:pointer;background:${s.bg_color||'#111'};display:flex;align-items:center;justify-content:center">${inner}</div>`;
+    }).join('');
+  } catch(e) {
+    // status_posts table belum wujud — ignore
+  }
 }
 
 function shareProfile() {
