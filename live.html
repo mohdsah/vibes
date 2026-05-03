@@ -126,6 +126,8 @@
     .gift-emoji-big{font-size:54px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5))}
     .gift-label{font-size:11px;font-weight:700;color:var(--gold);background:rgba(0,0,0,0.65);border-radius:20px;padding:2px 10px;white-space:nowrap}
     @keyframes giftFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-150px) scale(1.35)}100%{opacity:0;transform:translateY(-240px) scale(0.5)}}
+    @keyframes streakPop{0%{transform:scale(0.5);opacity:0}70%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+    @keyframes particlePop{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(0)}}
 
     /* ── SIDEBAR ────────────────────────── */
     .action-sidebar{position:absolute;bottom:90px;right:10px;display:flex;flex-direction:column;align-items:center;gap:16px;z-index:20}
@@ -810,13 +812,76 @@ function showLiveEnded() {
 }
 
 function showGiftAnimation(emoji, username, name) {
+  // Spawn 1–3 floaters depending on gift value
+  const count = name.includes('Crown') || name.includes('Rocket') ? 3 :
+                name.includes('Diamond') || name.includes('Car') ? 2 : 1;
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => spawnFloater(emoji, username, name, i === 0), i * 180);
+  }
+
+  // Streak counter — chain multiple same gifts
+  updateGiftStreak(emoji, name);
+}
+
+let giftStreakTimer = null;
+let giftStreakCount = {};
+
+function updateGiftStreak(emoji, name) {
+  const key = emoji;
+  giftStreakCount[key] = (giftStreakCount[key] || 0) + 1;
+
+  const existing = document.getElementById('giftStreak_' + key);
+  if (existing) {
+    existing.querySelector('.streak-num').textContent = 'x' + giftStreakCount[key];
+    existing.style.animation = 'none';
+    requestAnimationFrame(() => existing.style.animation = '');
+  } else if (giftStreakCount[key] >= 2) {
+    const streak = document.createElement('div');
+    streak.id = 'giftStreak_' + key;
+    streak.style.cssText = 'position:fixed;bottom:180px;right:16px;z-index:400;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.7);backdrop-filter:blur(10px);border-radius:20px;padding:8px 14px;border:1px solid rgba(255,255,255,0.15);font-family:"DM Sans",sans-serif;animation:streakPop 0.3s ease';
+    streak.innerHTML = `<span style="font-size:28px">${emoji}</span><span class="streak-num" style="font-size:22px;font-weight:900;color:#ffd700;text-shadow:0 0 12px rgba(255,215,0,0.8)">x${giftStreakCount[key]}</span>`;
+    document.body.appendChild(streak);
+  }
+
+  clearTimeout(giftStreakTimer);
+  giftStreakTimer = setTimeout(() => {
+    document.getElementById('giftStreak_' + key)?.remove();
+    giftStreakCount[key] = 0;
+  }, 3500);
+}
+
+function spawnFloater(emoji, username, name, showLabel) {
   const el = document.createElement('div');
   el.className = 'gift-floater';
-  el.style.left = (8 + Math.random() * 65) + '%';
-  el.style.bottom = '100px';
-  el.innerHTML = `<div class="gift-emoji-big">${emoji}</div><div class="gift-label">${username}: ${name}</div>`;
+
+  // Random left position, stagger slightly
+  const leftPct = 5 + Math.random() * 60;
+  el.style.cssText = `position:fixed;bottom:110px;left:${leftPct}%;z-index:350;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:3px;animation:giftFloat ${2.5 + Math.random()*0.8}s ease-out forwards`;
+
+  const labelHtml = showLabel ? `<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);text-shadow:0 1px 4px rgba(0,0,0,0.8);white-space:nowrap;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:10px">@${username} · ${name}</div>` : '';
+
+  el.innerHTML = `<div style="font-size:${48 + Math.floor(Math.random()*12)}px;filter:drop-shadow(0 4px 16px rgba(255,200,0,0.6))">${emoji}</div>${labelHtml}`;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3200);
+
+  // Spawn sparkle particles
+  spawnParticles(leftPct, emoji);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function spawnParticles(leftPct, emoji) {
+  const particles = ['✨','⭐','💫','🌟'];
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      const px = leftPct + (Math.random() - 0.5) * 20;
+      const py = 110 + Math.random() * 40;
+      p.style.cssText = `position:fixed;bottom:${py}px;left:${px}%;font-size:${12+Math.random()*10}px;z-index:345;pointer-events:none;animation:particlePop ${0.8+Math.random()*0.6}s ease-out forwards`;
+      p.textContent = particles[Math.floor(Math.random()*particles.length)];
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1500);
+    }, i * 80);
+  }
 }
 
 function showTargetComplete() {
@@ -1051,6 +1116,14 @@ function updateFollowBtn() {
 async function leaveLive() {
   clearTimeout(reconnectTimer);
   clearTimeout(offerTimeoutTimer);
+  clearTimeout(loveCountTimer);
+  clearTimeout(loveBroadcastTimer);
+  // Cleanup UI
+  document.getElementById('unmuteBtn')?.remove();
+  // Stop video
+  const video = document.getElementById('remoteVideo');
+  if (video) { video.pause(); video.srcObject = null; }
+  // Notify channel
   chatChannel?.send({ type: 'broadcast', event: 'viewer-left', payload: {} });
   if (currentUser) sb.from('live_rooms').update({ viewer_count: Math.max(0, viewerCount - 1) }).eq('id', roomId);
   if (localPc) { localPc.close(); localPc = null; }

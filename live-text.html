@@ -57,6 +57,10 @@
     .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.97);border:1px solid #333;border-radius:12px;padding:12px 20px;font-size:14px;color:white;z-index:999;display:none;white-space:nowrap}
     .toast.show{display:block}
   </style>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#ff2d55"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 </head>
 <body>
 
@@ -240,5 +244,6 @@ window.addEventListener('beforeunload', () => {
 
 init();
 </script>
+  <script src="js/pwa.js"></script>
 </body>
 </html>

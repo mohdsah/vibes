@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/desktop.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root { --bg:#000; --surface:#111; --border:#222; --accent:#ff2d55; --accent2:#ff6b35; --text:#fff; --muted:#888; --nav-h:60px; }
@@ -361,7 +362,7 @@ function createVideoItem(video, isLiked) {
     <div class="play-indicator" id="playInd_${video.id}">⏸</div>
     <div class="video-info">
       <a class="video-user" href="profile.html?id=${profile?.id}">
-        <img class="user-avatar" src="${avatarSrc}" alt="${profile?.display_name}" />
+        <img class="user-avatar" src="${avatarSrc}" alt="${profile?.display_name}" onerror="this.src=getAvatarUrl(null)" />
         <span class="user-name">@${profile?.username || 'unknown'}</span>
         ${currentUser && currentUser.id !== profile?.id ? `<button class="follow-inline-btn" onclick="toggleFollow(event,'${profile?.id}')">Follow</button>` : ''}
       </a>
@@ -370,7 +371,7 @@ function createVideoItem(video, isLiked) {
     </div>
     <div class="action-sidebar">
       <div class="avatar-action" onclick="window.location.href='profile.html?id=${profile?.id}'">
-        <img src="${avatarSrc}" alt="${profile?.display_name}" />
+        <img src="${avatarSrc}" alt="${profile?.display_name}" onerror="this.src=getAvatarUrl(null)" />
         ${currentUser && currentUser.id !== profile?.id ? `<div class="follow-dot" onclick="toggleFollow(event,'${profile?.id}')">+</div>` : ''}
       </div>
       <button class="action-btn ${isLiked ? 'liked' : ''}" id="likeBtn_${video.id}" onclick="toggleLike('${video.id}')">

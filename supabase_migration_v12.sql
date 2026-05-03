@@ -8,17 +8,12 @@
 ALTER TABLE live_rooms
   ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ DEFAULT NOW();
 
--- Populate started_at dari created_at untuk rows lama
-UPDATE live_rooms SET started_at = created_at WHERE started_at IS NULL;
+-- Populate dari updated_at (live_rooms tiada created_at)
+UPDATE live_rooms SET started_at = updated_at WHERE started_at IS NULL;
 
 -- ── 2. dm_messages — tambah image_url ────────────────────────────
 ALTER TABLE dm_messages
   ADD COLUMN IF NOT EXISTS image_url TEXT;
-
--- ── 3. profiles — tambah total_coins_spent (reference column) ────
--- (total_coins_spent ada dalam user_coins, tapi admin guna profiles.*
---  untuk display — tambah shortcut column)
--- NOTE: Ini optional, admin query guna JOIN dengan user_coins
 
 -- ── 4. live_text_rooms — tambah started_at ───────────────────────
 ALTER TABLE live_text_rooms

@@ -299,6 +299,21 @@ function handleFileSelect(input) {
   document.getElementById('previewWrap').style.display = 'block';
   document.getElementById('dropZone').style.display = 'none';
   document.getElementById('postBtn').classList.add('ready');
+
+  // Show thumbnail preview badge
+  captureVideoThumbnail(file).then(blob => {
+    if (!blob) return;
+    const thumbUrl = URL.createObjectURL(blob);
+    let badge = document.getElementById('thumbPreviewBadge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'thumbPreviewBadge';
+      badge.style.cssText = 'position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);border-radius:8px;padding:4px 8px;font-size:11px;color:#aaa;display:flex;align-items:center;gap:5px;z-index:5';
+      document.getElementById('previewWrap').style.position = 'relative';
+      document.getElementById('previewWrap').appendChild(badge);
+    }
+    badge.innerHTML = `<img src="${thumbUrl}" style="width:24px;height:38px;object-fit:cover;border-radius:3px;border:1px solid #444"/> Thumbnail dijana ✅`;
+  }).catch(() => {});
 }
 
 function removeVideo() {
@@ -365,13 +380,27 @@ async function uploadVideo() {
 
     if (uploadError) throw uploadError;
 
-    updateProgress(90, 'Saving video details...');
-
-    // Get public URL
+    // Get public URL + duration in parallel
     const { data: { publicUrl } } = sb.storage.from('videos').getPublicUrl(fileName);
-
-    // Get video duration
     const duration = await getVideoDuration(selectedFile);
+
+    updateProgress(90, 'Menjana thumbnail...');
+
+    // Auto-capture thumbnail from video
+    let thumbnailUrl = null;
+    try {
+      const thumbBlob = await captureVideoThumbnail(selectedFile);
+      if (thumbBlob) {
+        const thumbName = `thumbnails/${user.id}/${Date.now()}.jpg`;
+        const { error: tErr } = await sb.storage.from('videos').upload(thumbName, thumbBlob, { contentType: 'image/jpeg', upsert: false });
+        if (!tErr) {
+          const { data: { publicUrl: tUrl } } = sb.storage.from('videos').getPublicUrl(thumbName);
+          thumbnailUrl = tUrl;
+        }
+      }
+    } catch(e) { /* thumbnail optional — don't fail upload */ }
+
+    updateProgress(95, 'Menyimpan...');
 
     // Save to DB
     const { error: dbError } = await sb.from('videos').insert({
@@ -379,6 +408,7 @@ async function uploadVideo() {
       title: title || null,
       description: description || null,
       video_url: publicUrl,
+      thumbnail_url: thumbnailUrl,
       duration: Math.round(duration),
       is_public: isPublic
     });
@@ -401,6 +431,49 @@ async function uploadVideo() {
 function updateProgress(pct, text) {
   document.getElementById('progressBar').style.width = pct + '%';
   document.getElementById('progressText').textContent = text;
+}
+
+// ── AUTO THUMBNAIL ────────────────────────────
+function captureVideoThumbnail(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadeddata = () => {
+      // Seek to 1 second (or 10% of duration)
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      canvas.width = 360;
+      canvas.height = 640;
+      const ctx = canvas.getContext('2d');
+
+      // Center-crop to 9:16
+      const vRatio = video.videoWidth / video.videoHeight;
+      const cRatio = canvas.width / canvas.height;
+      let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
+      if (vRatio > cRatio) {
+        sw = video.videoHeight * cRatio;
+        sx = (video.videoWidth - sw) / 2;
+      } else {
+        sh = video.videoWidth / cRatio;
+        sy = (video.videoHeight - sh) / 2;
+      }
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(blob => {
+        URL.revokeObjectURL(video.src);
+        resolve(blob);
+      }, 'image/jpeg', 0.82);
+    };
+
+    video.onerror = () => { URL.revokeObjectURL(video.src); resolve(null); };
+    video.src = URL.createObjectURL(file);
+  });
 }
 
 function getVideoDuration(file) {

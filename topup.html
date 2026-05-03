@@ -376,31 +376,6 @@ async function init() {
     .subscribe();
 }
 
-// Handle return from ToyyibPay payment page
-async function handlePaymentReturn(topupId) {
-  showLoading('Mengesahkan pembayaran...', 'Sila tunggu sebentar');
-  await new Promise(r => setTimeout(r, 2000)); // wait for callback to process
-
-  const { data } = await sb.from('topup_requests').select('*').eq('id', topupId).maybeSingle();
-  hideLoading();
-
-  if (data?.status === 'approved') {
-    showStatusBanner('success', `✅ Berjaya! 💎${data.coins_amount.toLocaleString()} coins dikreditkan!`);
-    const { data: w } = await sb.from('user_coins').select('coins').eq('user_id', currentUser.id).maybeSingle();
-    if (w) {
-      myCoins = w.coins;
-      document.getElementById('balanceAmount').textContent = formatCount(myCoins);
-    }
-  } else if (data?.status === 'pending') {
-    showStatusBanner('pending', '⏳ Pembayaran sedang disahkan. Coins akan dikreditkan automatik.');
-  } else {
-    showStatusBanner('failed', '❌ Pembayaran gagal atau dibatalkan. Sila cuba lagi.');
-  }
-
-  // Clean URL
-  window.history.replaceState({}, '', window.location.pathname);
-}
-
 function showStatusBanner(type, msg) {
   const el = document.getElementById('statusBanner');
   el.className = 'status-banner ' + type;
