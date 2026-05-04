@@ -204,20 +204,25 @@ async function init() {
 }
 
 function renderHeader(profile) {
+  const el = document.getElementById('profileHeader');
+  if (!el) return;
   const avatarSrc = getAvatarUrl(profile);
-  document.getElementById('profileHeader').innerHTML = `
+  const displayName = profile.display_name || profile.username || '—';
+  const username = profile.username || '—';
+  el.innerHTML = `
     <div class="profile-avatar-wrap">
-      <img class="profile-avatar" src="${avatarSrc}" id="profileAvatar" alt="${profile.display_name}" />
+      <img class="profile-avatar" src="${avatarSrc}" id="profileAvatar" alt="${displayName}"
+           onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=ff2d55&color=fff'"/>
       ${isOwnProfile ? `<label class="avatar-upload-btn" for="avatarInput">📷<input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)" /></label>` : ''}
     </div>
-    <div class="profile-display-name">${profile.display_name || profile.username}</div>
-    <div class="profile-username">@${profile.username}</div>
+    <div class="profile-display-name">${displayName}</div>
+    <div class="profile-username">@${username}</div>
     ${profile.bio ? `<div class="profile-bio">${profile.bio}</div>` : ''}
     ${isOwnProfile ? `<div class="profile-coins" onclick="window.location.href='wallet.html'">💎 <span id="profileCoinsAmt">...</span> coins</div>` : ''}
     <div class="stats-row">
-      <div class="stat"><div class="stat-num">${formatCount(profile.following_count)}</div><div class="stat-label">Following</div></div>
-      <div class="stat"><div class="stat-num">${formatCount(profile.followers_count)}</div><div class="stat-label">Followers</div></div>
-      <div class="stat"><div class="stat-num">${formatCount(profile.videos_count)}</div><div class="stat-label">Videos</div></div>
+      <div class="stat"><div class="stat-num">${formatCount(profile.following_count||0)}</div><div class="stat-label">Following</div></div>
+      <div class="stat"><div class="stat-num">${formatCount(profile.followers_count||0)}</div><div class="stat-label">Followers</div></div>
+      <div class="stat"><div class="stat-num">${formatCount(profile.videos_count||0)}</div><div class="stat-label">Videos</div></div>
     </div>
     <div class="profile-actions">
       ${isOwnProfile
@@ -232,8 +237,6 @@ function renderHeader(profile) {
              <button class="btn-msg" onclick="shareProfile()" style="padding:10px 14px">↗️</button>
            </div>`}
     </div>`;
-
-  // Load coins for own profile
   if (isOwnProfile) loadProfileCoins();
 }
 
@@ -243,7 +246,8 @@ function switchTab(tab) {
   ['videos','liked','bookmarks','highlights','about'].forEach(t => {
     document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
   });
-  document.getElementById('videoGrid').innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  const grid = document.getElementById('videoGrid');
+  if (grid) grid.innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
   if (tab === 'liked') loadLikedVideos();
   else if (tab === 'bookmarks') loadBookmarks();
   else if (tab === 'highlights') loadHighlights();
@@ -252,31 +256,49 @@ function switchTab(tab) {
 }
 
 async function loadVideos(userId) {
-  document.getElementById('videoGrid').innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
-  const { data: vids } = await sb.from('videos').select('id,video_url,likes_count,views_count').eq('user_id', userId).eq('is_public', true).order('created_at', { ascending: false });
-  renderGrid(vids, 'videos');
+  const grid = document.getElementById('videoGrid');
+  if (grid) grid.innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  try {
+    const { data: vids } = await sb.from('videos')
+      .select('id,video_url,thumbnail_url,likes_count,views_count')
+      .eq('user_id', userId).eq('is_public', true)
+      .order('created_at', { ascending: false });
+    renderGrid(vids, 'videos');
+    // Update videos count in stats if column was 0
+    if (vids?.length > 0) {
+      const el = document.querySelector('.stats-row .stat:nth-child(3) .stat-num');
+      if (el && el.textContent === '0') el.textContent = formatCount(vids.length);
+    }
+  } catch(e) {
+    if (grid) grid.innerHTML = '<div class="empty-state"><div class="emoji">🎬</div><p>Gagal muatkan video</p></div>';
+  }
 }
 
 async function loadLikedVideos() {
-  document.getElementById('videoGrid').innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
-
-  // ✅ FIX: Use viewingProfile.id not currentUser.id (allows viewing others' liked videos)
-  const { data } = await sb.from('likes').select('videos(id,video_url,likes_count,views_count)').eq('user_id', viewingProfile.id).order('created_at', { ascending: false });
-  const vids = data?.map(d => d.videos).filter(Boolean) || [];
-  renderGrid(vids, 'liked');
+  const grid = document.getElementById('videoGrid');
+  if (grid) grid.innerHTML = '<div class="loader" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  try {
+    const { data } = await sb.from('likes').select('videos(id,video_url,thumbnail_url,likes_count,views_count)').eq('user_id', viewingProfile.id).order('created_at', { ascending: false });
+    const vids = data?.map(d => d.videos).filter(Boolean) || [];
+    renderGrid(vids, 'liked');
+  } catch(e) {
+    if (grid) grid.innerHTML = '<div class="empty-state"><div class="emoji">❤️</div><p>Tiada video dilike</p></div>';
+  }
 }
 
 function renderGrid(vids, type) {
   const grid = document.getElementById('videoGrid');
+  if (!grid) return;
   if (!vids || vids.length === 0) {
     grid.innerHTML = `<div class="empty-state"><div class="emoji">${type === 'liked' ? '❤️' : '🎬'}</div><p>${type === 'liked' ? 'Tiada video dilike lagi' : (isOwnProfile ? 'Upload video pertama kau!' : 'Tiada video lagi')}</p>${isOwnProfile && type === 'videos' ? `<a href="upload.html" style="color:var(--accent);font-weight:600;display:block;margin-top:10px;">Upload →</a>` : ''}</div>`;
     return;
   }
   grid.innerHTML = vids.map(v => `
     <div class="video-thumb" onclick="window.location.href='video.html?id=${v.id}'">
-      <video src="${v.video_url}" muted preload="metadata"></video>
+      ${v.thumbnail_url ? `<img src="${v.thumbnail_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0" alt="" loading="lazy"/>` : ''}
+      <video src="${v.video_url}" muted preload="none" ${v.thumbnail_url?'':'preload="metadata"'}></video>
       <div class="thumb-overlay"></div>
-      <div class="thumb-stats">${type === 'liked' ? '❤️' : '▶'} ${formatCount(type === 'liked' ? v.likes_count : v.views_count)}</div>
+      <div class="thumb-stats">${type === 'liked' ? '❤️' : '▶'} ${formatCount(type === 'liked' ? (v.likes_count||0) : (v.views_count||0))}</div>
     </div>`).join('');
 }
 
